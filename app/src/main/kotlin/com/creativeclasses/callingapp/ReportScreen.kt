@@ -46,7 +46,7 @@ fun ReportScreen(vm: CallingViewModel) {
             value = vm.reportText,
             onValueChange = { vm.reportText = it },
             readOnly = !editing,
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp).enter3D()
+            modifier = Modifier.holdsBreak().weight(1f).fillMaxWidth().padding(vertical = 8.dp).enter3D()
                 .shadow(10.dp, CardShape).background(CardSheen, CardShape),
             shape = CardShape,
         )

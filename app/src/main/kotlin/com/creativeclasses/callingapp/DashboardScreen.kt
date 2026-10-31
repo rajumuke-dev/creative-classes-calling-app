@@ -57,6 +57,7 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGL
 @Composable
 fun DashboardScreen(vm: CallingViewModel) {
     var pendingDelete by remember { mutableStateOf<SavedSession?>(null) }
+    var breakSettings by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
@@ -77,6 +78,19 @@ fun DashboardScreen(vm: CallingViewModel) {
             }
         }
         Button(onClick = vm::newSession, Modifier.fillMaxWidth().tiltOnTouch(8f), elevation = raisedButton()) { Text("New Calling Session") }
+        val every = vm.breakTimer.minutes
+        TextButton(onClick = { breakSettings = true }, Modifier.align(Alignment.CenterHorizontally)) {
+            Text(if (every > 0) "\u2615 Break reminder: every $every min" else "\u2615 Break reminder: off")
+        }
+    }
+
+    if (breakSettings) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { breakSettings = false },
+            title = { Text("Take a break") },
+            text = { BreakSettings(vm.breakTimer) },
+            confirmButton = { TextButton(onClick = { breakSettings = false }) { Text("Done") } },
+        )
     }
 
     pendingDelete?.let { session ->

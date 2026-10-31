@@ -29,8 +29,9 @@ silent when the phone is on silent/vibrate or system "Touch sounds" is off.
 
 **Take a break** (works like YouTube's reminder): after 15 minutes of continuous work a reminder appears with a
 glass filling with water, a soft "water drop" sound and a short health quote, asking you to drink water, stretch
-and rest your eyes. Tap **OK** to start the next 15 minutes, or **Change reminder** to pick every 15, 30, 45 or 60
-minutes (remembered). Time on parent calls counts as work; leaving the app for 30 minutes or closing it restarts
+and rest your eyes. Tap **OK** to start the next 15 minutes, **Snooze 5 min** to be reminded shortly, or **Change** to pick
+every 15, 30, 45 or 60 minutes or switch reminders off (remembered; also under "Break reminder" on the dashboard).
+The reminder never interrupts typing: it waits until you leave the text box. Time on parent calls counts as work; leaving the app for 30 minutes or closing it restarts
 the timer, and a reminder that falls due during a call appears when you return.
 
 **Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on

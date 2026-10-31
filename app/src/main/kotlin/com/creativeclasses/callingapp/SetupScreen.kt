@@ -103,7 +103,7 @@ fun SetupScreen(vm: CallingViewModel) {
                     label = { Text("Marks") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    modifier = Modifier.holdsBreak().weight(1f).padding(start = 8.dp),
                 )
             }
             Text(
@@ -159,6 +159,6 @@ private fun Field(label: String, value: String, onChange: (String) -> Unit) {
         onValueChange = onChange,
         label = { Text(label) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier.holdsBreak().fillMaxWidth().padding(top = 8.dp),
     )
 }

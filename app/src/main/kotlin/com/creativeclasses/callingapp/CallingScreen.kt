@@ -159,7 +159,7 @@ fun CallingScreen(vm: CallingViewModel) {
                     label = { Text("Marks") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    modifier = Modifier.holdsBreak().weight(1f).padding(start = 8.dp),
                 )
             }
         }
@@ -226,7 +226,7 @@ fun CallingScreen(vm: CallingViewModel) {
                                 label = { Text("Marks") },
                                 singleLine = true,
                                 isError = vm.marksRule == MarksRule.BELOW && vm.matchesMarks(i),
-                                modifier = Modifier.width(96.dp),
+                                modifier = Modifier.holdsBreak().width(96.dp),
                             )
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -285,7 +285,7 @@ fun CallingScreen(vm: CallingViewModel) {
                             value = record.remark.orEmpty(),
                             onValueChange = { v -> vm.updateRecord(i) { it.copy(remark = v) } },
                             label = { Text("Remark") },
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            modifier = Modifier.holdsBreak().fillMaxWidth().padding(top = 8.dp),
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = {

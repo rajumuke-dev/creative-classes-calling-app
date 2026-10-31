@@ -19,16 +19,23 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.composed
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -40,14 +47,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.PI
 import kotlin.math.sin
 
 /**
- * "Take a break" reminder modelled on YouTube's: after [minutes] of continuous use a reminder appears that can be
- * dismissed or have its frequency changed. Time on parent calls counts as work; being away from the app for
- * [AWAY_RESET_MS] (or closing it) counts as a break and restarts the timer.
+ * "Take a break" reminder modelled on YouTube's and Stretchly's: after [minutes] of continuous use a reminder appears
+ * that can be dismissed, snoozed for [SNOOZE_MS] or switched off ([minutes] = 0). It waits while the teacher is typing.
+ * Time on parent calls counts as work; being away from the app for [AWAY_RESET_MS] (or closing it) counts as a break.
  */
 class BreakTimer(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -55,7 +62,11 @@ class BreakTimer(context: Context) {
         private set
     var due by mutableStateOf(false)
         private set
-    private var workStart = SystemClock.elapsedRealtime()
+
+    /** The focused text field, if any; the reminder waits so it never interrupts a remark. */
+    private var holder by mutableStateOf<Any?>(null)
+    val typing get() = holder != null
+    private var workStart by mutableLongStateOf(SystemClock.elapsedRealtime())
     private var awayAt = 0L
 
     fun onAppStart() {
@@ -69,10 +80,11 @@ class BreakTimer(context: Context) {
 
     /** Runs while the app is on screen; a reminder that fell due during a call shows on return. */
     suspend fun run() {
-        while (true) {
-            snapshotFlow { due }.first { !it }
-            delay(workStart + minutes * 60_000L - SystemClock.elapsedRealtime())
-            due = true
+        snapshotFlow { Triple(due, minutes, workStart) }.collectLatest { (isDue, m, start) ->
+            if (!isDue && m > 0) {
+                delay(start + m * 60_000L - SystemClock.elapsedRealtime())
+                due = true
+            }
         }
     }
 
@@ -81,7 +93,21 @@ class BreakTimer(context: Context) {
         due = false
     }
 
+    fun hold(field: Any) {
+        holder = field
+    }
+
+    fun release(field: Any) {
+        if (holder === field) holder = null
+    }
+
+    fun snooze() {
+        workStart = SystemClock.elapsedRealtime() - minutes * 60_000L + SNOOZE_MS
+        due = false
+    }
+
     fun changeMinutes(value: Int) {
+        if (minutes == 0) workStart = SystemClock.elapsedRealtime()
         minutes = value
         prefs.edit().putInt(KEY_MINUTES, value).apply()
     }
@@ -89,13 +115,22 @@ class BreakTimer(context: Context) {
     companion object {
         val CHOICES = listOf(15, 30, 45, 60)
         private const val KEY_MINUTES = "breakMinutes"
+        private const val SNOOZE_MS = 5 * 60_000L
         private const val AWAY_RESET_MS = 30 * 60_000L
     }
 }
 
+/** Holds the break reminder while this text field is focused; released on blur or when the field leaves the screen. */
+fun Modifier.holdsBreak(): Modifier = composed {
+    val timer = viewModel<CallingViewModel>().breakTimer
+    val token = remember { Any() }
+    DisposableEffect(token) { onDispose { timer.release(token) } }
+    onFocusChanged { if (it.isFocused) timer.hold(token) else timer.release(token) }
+}
+
 @Composable
 fun BreakReminder(timer: BreakTimer) {
-    if (!timer.due) return
+    if (!timer.due || timer.typing) return
     val context = LocalContext.current
     LaunchedEffect(Unit) { Sounds.play(context, Sounds.Cue.BREAK) }
     var changing by rememberSaveable { mutableStateOf(false) }
@@ -109,19 +144,36 @@ fun BreakReminder(timer: BreakTimer) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("You've been working for $worked minutes. Drink a glass of water, stretch and rest your eyes.")
                 Text("\u201C${quote.first}\u201D \u2014 ${quote.second}", style = MaterialTheme.typography.bodyMedium, fontStyle = FontStyle.Italic, color = MaterialTheme.colorScheme.primary)
-                if (changing) {
-                    Text("Remind me every (minutes)")
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        BreakTimer.CHOICES.forEach { m ->
-                            FilterChip(selected = timer.minutes == m, onClick = { timer.changeMinutes(m) }, label = { Text("$m") })
-                        }
-                    }
-                }
+                if (changing) BreakSettings(timer)
             }
         },
         confirmButton = { Button(onClick = timer::dismiss, elevation = raisedButton()) { Text("OK") } },
-        dismissButton = { if (!changing) TextButton(onClick = { changing = true }) { Text("Change reminder") } },
+        dismissButton = {
+            Row {
+                if (timer.minutes > 0) TextButton(onClick = timer::snooze) { Text("Snooze 5 min") }
+                if (!changing) TextButton(onClick = { changing = true }) { Text("Change") }
+            }
+        },
     )
+}
+
+/** On/off switch and frequency; shared by the reminder and the dashboard. */
+@Composable
+fun BreakSettings(timer: BreakTimer) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Break reminders", Modifier.weight(1f))
+            Switch(checked = timer.minutes > 0, onCheckedChange = { timer.changeMinutes(if (it) BreakTimer.CHOICES.first() else 0) })
+        }
+        if (timer.minutes > 0) {
+            Text("Remind me every (minutes)")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                BreakTimer.CHOICES.forEach { m ->
+                    FilterChip(selected = timer.minutes == m, onClick = { timer.changeMinutes(m) }, label = { Text("$m") })
+                }
+            }
+        }
+    }
 }
 
 private val HEALTH_QUOTES = listOf(
