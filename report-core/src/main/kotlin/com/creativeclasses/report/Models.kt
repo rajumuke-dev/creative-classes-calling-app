@@ -45,6 +45,9 @@ data class CallRecord(
     val followUpRequired: Boolean = false,
 )
 
+fun CallRecord.needsFollowUp() =
+    followUpRequired || outcome == CallOutcome.NO_ANSWER || outcome == CallOutcome.CALL_LATER
+
 enum class ReportStatus(val label: String) {
     NOT_STARTED("Not Started"),
     PARTIALLY_COMPLETED("Partially Completed"),

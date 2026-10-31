@@ -3,7 +3,8 @@ package com.creativeclasses.callingapp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.CallRecord
@@ -11,15 +12,23 @@ import com.creativeclasses.report.CallingPurpose
 import com.creativeclasses.report.CallingSession
 import com.creativeclasses.report.ImportedStudent
 import com.creativeclasses.report.ReportGenerator
+import com.creativeclasses.report.SessionProgress
+import com.creativeclasses.report.needsFollowUp
 import com.creativeclasses.report.StudentImporter
 import com.creativeclasses.report.XlsxReader
 import com.creativeclasses.report.XlsxWorkbook
 import java.io.InputStream
 import java.time.LocalDate
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-enum class Screen { SETUP, CALLING, REPORT }
+enum class Screen { DASHBOARD, SETUP, CALLING, REPORT }
+
+enum class CallFilter(val label: String) { ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up") }
 
 data class SessionForm(
     val sessionName: String = "",
@@ -32,9 +41,15 @@ data class SessionForm(
     val teacher: String = "",
 )
 
-/** State is held in memory only: it survives rotation but not process death. */
-class CallingViewModel : ViewModel() {
-    var screen by mutableStateOf(Screen.SETUP)
+/** Calling sessions are saved to private storage after every change, so work resumes after the app is closed. */
+class CallingViewModel(app: Application) : AndroidViewModel(app) {
+    private val store = SessionStore(app)
+    private var currentId: String? = null
+    private var saveJob: Job? = null
+    var sessions by mutableStateOf<List<SavedSession>>(emptyList())
+    var filter by mutableStateOf(CallFilter.ALL)
+    var resumeIndex by mutableStateOf(0)
+    var screen by mutableStateOf(Screen.DASHBOARD)
     var sheetNames by mutableStateOf<List<String>>(emptyList())
     var selectedSheet by mutableStateOf<Int?>(null)
     var students by mutableStateOf<List<ImportedStudent>>(emptyList())
@@ -42,8 +57,83 @@ class CallingViewModel : ViewModel() {
     var form by mutableStateOf(SessionForm())
     var message by mutableStateOf<String?>(null)
     var reportText by mutableStateOf("")
-    val date: LocalDate = LocalDate.now()
+    var date: LocalDate = LocalDate.now()
     private var workbook: XlsxWorkbook? = null
+
+    init {
+        refreshSessions()
+    }
+
+    val visibleIndices: List<Int>
+        get() = records.indices.filter {
+            when (filter) {
+                CallFilter.ALL -> true
+                CallFilter.NOT_CALLED -> records[it].outcome == CallOutcome.NOT_CALLED
+                CallFilter.FOLLOW_UP -> records[it].needsFollowUp()
+            }
+        }
+
+    fun refreshSessions() {
+        viewModelScope.launch { sessions = withContext(Dispatchers.IO) { store.list() } }
+    }
+
+    fun newSession() {
+        currentId = null
+        workbook = null
+        sheetNames = emptyList()
+        selectedSheet = null
+        students = emptyList()
+        records = emptyList()
+        form = SessionForm()
+        date = LocalDate.now()
+        message = null
+        screen = Screen.SETUP
+    }
+
+    fun openSession(session: SavedSession) {
+        currentId = session.id
+        form = session.form
+        date = session.date
+        students = session.students
+        records = session.records
+        filter = CallFilter.ALL
+        resumeIndex = SessionProgress.of(session.records).resumeIndex ?: 0
+        screen = Screen.CALLING
+    }
+
+    fun deleteSession(id: String) {
+        viewModelScope.launch {
+            sessions = withContext(Dispatchers.IO) {
+                store.delete(id)
+                store.list()
+            }
+        }
+    }
+
+    fun goToDashboard() {
+        saveNow()
+        screen = Screen.DASHBOARD
+        refreshSessions()
+    }
+
+    /** Synchronous so it also works from onStop; the file is small. */
+    fun saveNow() {
+        saveJob?.cancel()
+        write()
+    }
+
+    private fun write() {
+        val id = currentId ?: return
+        store.save(SavedSession(id, form, date, students, records))
+    }
+
+    private fun scheduleSave() {
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(400)
+            write()
+        }
+    }
 
     fun importFile(open: () -> InputStream?) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -93,11 +183,18 @@ class CallingViewModel : ViewModel() {
             form.purpose == CallingPurpose.OTHER && form.customPurpose.isBlank() -> "Please enter the custom purpose."
             else -> null
         }
-        if (message == null) screen = Screen.CALLING
+        if (message == null) {
+            if (currentId == null) currentId = UUID.randomUUID().toString()
+            filter = CallFilter.ALL
+            resumeIndex = 0
+            saveNow()
+            screen = Screen.CALLING
+        }
     }
 
     fun updateRecord(index: Int, change: (CallRecord) -> CallRecord) {
         records = records.toMutableList().also { it[index] = change(it[index]) }
+        scheduleSave()
     }
 
     fun prepareReport() {

@@ -12,7 +12,10 @@ Android app for teachers to call parents from an Excel list, record outcomes and
   **Share Report** → editable preview → **Share on WhatsApp** (`ACTION_SEND`, `text/plain`; falls back to the
   share sheet). Nothing is ever sent automatically.
 
-State is kept in memory only (survives rotation, not process death).
+Sessions are saved on the phone after every change (private app storage, one JSON file per session). The
+dashboard lists every session with called / total, the outcome breakdown and the next student to call;
+"Continue calling" opens the list at the first student not yet called. The calling list can be filtered
+(All / Not called / Follow-up). No Answer and Call Later count as called (attempted).
 
 ## Build
 

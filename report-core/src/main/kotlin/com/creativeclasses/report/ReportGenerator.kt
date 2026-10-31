@@ -163,8 +163,6 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
 
     private fun CallRecord.isContacted() = outcome == CallOutcome.CONTACTED || outcome == CallOutcome.CONCERN_RAISED
     private fun CallRecord.hasConcern() = isContacted() && (outcome == CallOutcome.CONCERN_RAISED || concerns.isNotEmpty())
-    private fun CallRecord.needsFollowUp() =
-        followUpRequired || outcome == CallOutcome.NO_ANSWER || outcome == CallOutcome.CALL_LATER
     private fun CallRecord.isQuiet() =
         outcome == CallOutcome.CONTACTED && !hasConcern() && !needsFollowUp() && cleanRemark(remark) == null
     private fun CallRecord.displayName() = studentName.clean() ?: "Student (name not recorded)"

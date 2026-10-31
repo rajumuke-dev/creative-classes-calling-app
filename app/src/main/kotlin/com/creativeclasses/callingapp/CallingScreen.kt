@@ -1,5 +1,9 @@
 package com.creativeclasses.callingapp
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -12,16 +16,18 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +38,7 @@ import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.Concern
 import com.creativeclasses.report.PhoneNumbers
+import com.creativeclasses.report.SessionProgress
 
 private val OUTCOME_CHOICES = listOf(
     CallOutcome.CONTACTED to "Contacted",
@@ -44,21 +51,36 @@ private val OUTCOME_CHOICES = listOf(
 @Composable
 fun CallingScreen(vm: CallingViewModel) {
     val context = LocalContext.current
-    val done = vm.records.count { it.outcome != CallOutcome.NOT_CALLED }
+    val progress = SessionProgress.of(vm.records)
+    val shown = vm.visibleIndices
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = vm.resumeIndex)
+    val bar by animateFloatAsState(if (progress.total == 0) 0f else progress.attempted.toFloat() / progress.total, label = "progress")
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Text(
-            "Calls recorded: $done / ${vm.records.size}",
-            Modifier.padding(16.dp),
-            style = MaterialTheme.typography.titleMedium,
-        )
+        Row(Modifier.padding(start = 4.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = vm::goToDashboard) { Text("Dashboard") }
+            Text(
+                "Called ${progress.attempted} / ${progress.total}",
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        LinearProgressIndicator(progress = { bar }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CallFilter.values().forEach { f ->
+                FilterChip(selected = vm.filter == f, onClick = { vm.filter = f }, label = { Text(f.label) })
+            }
+        }
+        if (shown.isEmpty()) Text("No students in this view.", Modifier.padding(16.dp))
         LazyColumn(
             Modifier.weight(1f),
+            state = listState,
             contentPadding = PaddingValues(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(vm.records) { i, record ->
-                Card(Modifier.fillMaxWidth()) {
+            items(shown, key = { it }) { i ->
+                val record = vm.records[i]
+                Card(Modifier.fillMaxWidth().animateItem().animateContentSize()) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -84,7 +106,9 @@ fun CallingScreen(vm: CallingViewModel) {
                                 )
                             }
                         }
-                        if (record.outcome == CallOutcome.CONCERN_RAISED) ConcernChips(record) { c -> vm.updateRecord(i) { c(it) } }
+                        AnimatedVisibility(record.outcome == CallOutcome.CONCERN_RAISED) {
+                            ConcernChips(record) { c -> vm.updateRecord(i) { c(it) } }
+                        }
                         OutlinedTextField(
                             value = record.remark.orEmpty(),
                             onValueChange = { v -> vm.updateRecord(i) { it.copy(remark = v) } },
