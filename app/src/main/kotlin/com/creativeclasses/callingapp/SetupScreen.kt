@@ -3,6 +3,13 @@ package com.creativeclasses.callingapp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.KeyboardType
+import com.creativeclasses.report.MarksRule
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +49,11 @@ fun SetupScreen(vm: CallingViewModel) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importFile { context.contentResolver.openInputStream(uri) }
     }
+    val marksPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importMarksImage(uri)
+    }
     val form = vm.form
+    var ruleMenu by remember { mutableStateOf(false) }
     var purposeMenu by remember { mutableStateOf(false) }
 
     Column(
@@ -52,7 +63,7 @@ fun SetupScreen(vm: CallingViewModel) {
         Text("Parent Calling", style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(16.dp))
 
-        Button(onClick = { picker.launch(arrayOf(XLSX_MIME)) }, Modifier.fillMaxWidth()) {
+        Button(onClick = { picker.launch(arrayOf(XLSX_MIME)) }, Modifier.fillMaxWidth(), elevation = raisedButton()) {
             Text("Import Excel (.xlsx)")
         }
         vm.message?.let { Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
@@ -63,6 +74,38 @@ fun SetupScreen(vm: CallingViewModel) {
                     FilterChip(selected = vm.selectedSheet == i, onClick = { vm.selectSheet(i) }, label = { Text(name) })
                 }
             }
+        }
+        if (vm.students.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text("Filter by marks (optional)")
+            OutlinedButton(onClick = { marksPicker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
+                Text(if (vm.hasMarks) "Marks image uploaded - upload again" else "Upload marks image")
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    OutlinedButton(onClick = { ruleMenu = true }) { Text("${vm.marksRule.label} \u25BE") }
+                    DropdownMenu(expanded = ruleMenu, onDismissRequest = { ruleMenu = false }) {
+                        MarksRule.values().forEach { r ->
+                            DropdownMenuItem(text = { Text(r.label) }, onClick = {
+                                vm.updateMarksRule(r)
+                                ruleMenu = false
+                            })
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = vm.threshold,
+                    onValueChange = vm::updateThreshold,
+                    label = { Text("Marks") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+            }
+            Text(
+                "Upload the marks image and enter the marks to start with only the matching students.",
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
         Spacer(Modifier.height(16.dp))
 
@@ -91,9 +134,17 @@ fun SetupScreen(vm: CallingViewModel) {
         )
 
         Spacer(Modifier.height(16.dp))
-        Button(onClick = vm::startCalling, Modifier.fillMaxWidth()) {
+        Button(onClick = vm::startCalling, Modifier.fillMaxWidth(), elevation = raisedButton()) {
             Text(if (vm.students.isEmpty()) "Start Calling" else "Start Calling (${vm.students.size} students)")
         }
+    }
+    vm.marksNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = { vm.marksNotice = null },
+            title = { Text("Marks from image") },
+            text = { Text(notice, Modifier.verticalScroll(rememberScrollState())) },
+            confirmButton = { TextButton(onClick = { vm.marksNotice = null }) { Text("OK") } },
+        )
     }
 }
 

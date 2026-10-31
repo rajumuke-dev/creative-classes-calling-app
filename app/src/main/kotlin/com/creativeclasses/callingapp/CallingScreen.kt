@@ -28,7 +28,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,13 +50,14 @@ import android.content.Context
 import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.Concern
+import com.creativeclasses.report.MarksRule
 import com.creativeclasses.report.PhoneNumbers
 import com.creativeclasses.report.SessionProgress
 
 private val OUTCOME_CHOICES = listOf(
     CallOutcome.CONTACTED to "Contacted",
     CallOutcome.CONCERN_RAISED to "Concern Raised",
-    CallOutcome.NO_ANSWER to "No Answer",
+    CallOutcome.NO_ANSWER to "Call Not Received",
     CallOutcome.CALL_LATER to "Call Later",
 )
 
@@ -65,6 +69,11 @@ fun CallingScreen(vm: CallingViewModel) {
     val shown = vm.visibleIndices
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = vm.resumeIndex)
     var showMarks by remember { mutableStateOf(false) }
+    var speakIndex by remember { mutableStateOf<Int?>(null) }
+    val startVoice = rememberVoiceInput { spoken ->
+        speakIndex?.let { i -> vm.updateRecord(i) { it.copy(remark = appendSpoken(it.remark, spoken)) } }
+        speakIndex = null
+    }
     val bar by animateFloatAsState(if (progress.total == 0) 0f else progress.attempted.toFloat() / progress.total, label = "progress")
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -83,19 +92,33 @@ fun CallingScreen(vm: CallingViewModel) {
                 FilterChip(selected = vm.filter == f, onClick = { vm.filter = f }, label = { Text(f.label) })
             }
         }
-        if (vm.filter == CallFilter.LOW_MARKS) {
-            OutlinedTextField(
-                value = vm.lowBelow,
-                onValueChange = vm::updateLowBelow,
-                label = { Text("Show students scoring below (marks)") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+        if (vm.filter == CallFilter.BY_MARKS) {
+            var ruleMenu by remember { mutableStateOf(false) }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    OutlinedButton(onClick = { ruleMenu = true }) { Text("${vm.marksRule.label} \u25BE") }
+                    DropdownMenu(expanded = ruleMenu, onDismissRequest = { ruleMenu = false }) {
+                        MarksRule.values().forEach { r ->
+                            DropdownMenuItem(text = { Text(r.label) }, onClick = {
+                                vm.updateMarksRule(r)
+                                ruleMenu = false
+                            })
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = vm.threshold,
+                    onValueChange = vm::updateThreshold,
+                    label = { Text("Marks") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+            }
         }
         if (shown.isEmpty()) {
-            val hint = if (vm.filter == CallFilter.LOW_MARKS && !vm.marksReady) {
-                "Enter the marks above to list students scoring below it."
+            val hint = if (vm.filter == CallFilter.BY_MARKS && !vm.marksReady) {
+                "Choose Lower than or Higher than and enter the marks above."
             } else {
                 "No students in this view."
             }
@@ -109,7 +132,11 @@ fun CallingScreen(vm: CallingViewModel) {
         ) {
             items(shown, key = { it }) { i ->
                 val record = vm.records[i]
-                Card(Modifier.fillMaxWidth().animateItem().animateContentSize()) {
+                ElevatedCard(
+                    Modifier.fillMaxWidth().animateItem().animateContentSize(),
+                    shape = CardShape,
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+                ) {
                     Column(Modifier.padding(12.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -126,7 +153,7 @@ fun CallingScreen(vm: CallingViewModel) {
                                 onValueChange = { vm.setMark(i, it) },
                                 label = { Text("Marks") },
                                 singleLine = true,
-                                isError = vm.isLow(i),
+                                isError = vm.marksRule == MarksRule.BELOW && vm.matchesMarks(i),
                                 modifier = Modifier.width(96.dp),
                             )
                         }
@@ -153,6 +180,10 @@ fun CallingScreen(vm: CallingViewModel) {
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = {
+                                speakIndex = i
+                                startVoice()
+                            }) { Text("\uD83C\uDF99 Speak") }
                             Checkbox(
                                 checked = record.followUpRequired,
                                 onCheckedChange = { v -> vm.updateRecord(i) { it.copy(followUpRequired = v) } },
@@ -166,9 +197,17 @@ fun CallingScreen(vm: CallingViewModel) {
         Button(
             onClick = vm::prepareReport,
             Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding(),
+            elevation = raisedButton(),
         ) { Text("Share Report") }
     }
     if (showMarks) MarksDialog(vm) { showMarks = false }
+    vm.filterNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = { vm.filterNotice = null },
+            text = { Text(notice) },
+            confirmButton = { TextButton(onClick = { vm.filterNotice = null }) { Text("OK") } },
+        )
+    }
 }
 
 @Composable
@@ -212,18 +251,11 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
         title = { Text("Marks") },
         text = {
             Column {
-                OutlinedTextField(
-                    value = vm.lowBelow,
-                    onValueChange = vm::updateLowBelow,
-                    label = { Text("Low marks: below (marks)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
                     Text("Read marks from image")
                 }
                 Text(
-                    "Type AB for absent. Absent and blank students are not counted as low marks. Marks are not added to the report.",
+                    "Type AB for absent. Absent and blank students never match Lower than / Higher than. Marks are not added to the report.",
                     Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )

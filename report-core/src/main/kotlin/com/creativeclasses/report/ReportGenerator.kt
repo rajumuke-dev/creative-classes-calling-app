@@ -11,11 +11,12 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         val contacted = records.count { it.isContacted() }
         val noAnswer = records.count { it.outcome == CallOutcome.NO_ANSWER }
         val callLater = records.count { it.outcome == CallOutcome.CALL_LATER }
-        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED }
+        val noContact = records.count { it.noContact() }
+        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED } - noContact
         val concerns = records.count { it.hasConcern() }
         val followUps = records.count { it.needsFollowUp() }
-        val unresolved = noAnswer + callLater + notCalled
-        val status = statusOf(total, notCalled, unresolved, concerns, followUps)
+        val unresolved = noAnswer + callLater + notCalled + noContact
+        val status = statusOf(total, notCalled + noContact, unresolved, concerns, followUps)
         val subject = subjectOf(session)
 
         val out = StringBuilder()
@@ -34,14 +35,15 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
 
         out.appendLine("Total Parents: $total")
         out.appendLine("Parents Contacted: $contacted")
-        if (noAnswer > 0) out.appendLine("No Answer: $noAnswer")
+        if (noAnswer > 0) out.appendLine("Call Not Received: $noAnswer")
         if (callLater > 0) out.appendLine("Call Later: $callLater")
         if (notCalled > 0) out.appendLine("Not Yet Called: $notCalled")
+        if (noContact > 0) out.appendLine("Contact Not Found: $noContact")
         if (concerns > 0) out.appendLine("Concerns Raised: $concerns")
         out.appendLine("Follow-ups Required: $followUps")
         out.appendLine()
 
-        closing(status, subject, contacted, concerns, followUps, noAnswer + callLater, notCalled)
+        closing(status, subject, contacted, concerns, followUps, noAnswer + callLater, notCalled, noContact)
             .forEach { out.appendLine(it) }
 
         val listed = records.filterNot { it.isQuiet() }
@@ -89,7 +91,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
 
     private fun closing(
         status: ReportStatus, subject: String, contacted: Int, concerns: Int,
-        followUps: Int, unreached: Int, notCalled: Int,
+        followUps: Int, unreached: Int, notCalled: Int, noContact: Int,
     ): List<String> {
         if (status == ReportStatus.COMPLETED_SUCCESSFULLY) {
             return listOf("All parents were informed regarding $subject and no concerns were reported.")
@@ -98,6 +100,12 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         if (concerns == 0 && contacted > 0) lines += "No concerns were raised by the parents contacted."
         if (unreached > 0) lines += "Follow-up calls are required for the parents who could not be reached."
         if (notCalled > 0) lines += "${count(notCalled, "call is", "calls are")} yet to be made."
+        if (noContact > 0) {
+            lines += "${count(noContact, "parent", "parents")} could not be called as no valid contact number was found."
+        }
+        if (noContact > 0) {
+            lines += "${count(noContact, "parent", "parents")} could not be called as no valid contact number was found."
+        }
         if (followUps == 0 && unreached == 0 && notCalled == 0) lines += "No follow-up action is required."
         return lines
     }
@@ -108,6 +116,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
             if (r.isContacted()) "Follow-up required." else "Follow-up call required.",
         ) else emptyList()
         val body = when {
+            r.noContact() -> listOf("Contact number not found, so the parent could not be called.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.NOT_CALLED -> listOf("Call has not been made yet.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.NO_ANSWER -> listOf("Parent could not be reached.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.CALL_LATER -> listOf("Parent is to be called again later.") + sentenceOrEmpty(remark)

@@ -13,7 +13,9 @@ import com.creativeclasses.report.CallingSession
 import com.creativeclasses.report.ImportedStudent
 import com.creativeclasses.report.MarkRowParser
 import com.creativeclasses.report.Marks
+import com.creativeclasses.report.MarksRule
 import com.creativeclasses.report.NameMatcher
+import com.creativeclasses.report.PhoneNumbers
 import com.creativeclasses.report.ReportGenerator
 import com.creativeclasses.report.SessionProgress
 import com.creativeclasses.report.needsFollowUp
@@ -33,7 +35,7 @@ import kotlinx.coroutines.withContext
 enum class Screen { DASHBOARD, SETUP, CALLING, REPORT }
 
 enum class CallFilter(val label: String) {
-    ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up"), LOW_MARKS("Low marks"), ABSENT("Absent")
+    ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up"), BY_MARKS("By marks"), ABSENT("Absent")
 }
 
 data class SessionForm(
@@ -61,8 +63,11 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     var students by mutableStateOf<List<ImportedStudent>>(emptyList())
     var records by mutableStateOf<List<CallRecord>>(emptyList())
     var marks by mutableStateOf<List<String>>(emptyList())
-    var lowBelow by mutableStateOf("")
+    var threshold by mutableStateOf("")
+    var marksRule by mutableStateOf(MarksRule.BELOW)
     var marksNotice by mutableStateOf<String?>(null)
+    var filterNotice by mutableStateOf<String?>(null)
+    var reportScope by mutableStateOf<String?>(null)
     var form by mutableStateOf(SessionForm())
     var message by mutableStateOf<String?>(null)
     var reportText by mutableStateOf("")
@@ -73,17 +78,20 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         refreshSessions()
     }
 
-    private val lowBelowValue get() = lowBelow.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+    private val thresholdValue get() = threshold.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
 
-    fun isLow(index: Int) = Marks.isLow(marks.getOrNull(index), lowBelowValue)
+    fun matchesMarks(index: Int) = Marks.matches(marks.getOrNull(index), marksRule, thresholdValue)
 
     val hasMarks get() = marks.any { it.isNotBlank() }
-    val marksReady get() = lowBelowValue != null
+    val marksReady get() = thresholdValue != null
 
     /** Low marks are listed lowest score first so the weakest students are called first. */
     val visibleIndices: List<Int>
         get() = when (filter) {
-            CallFilter.LOW_MARKS -> records.indices.filter { isLow(it) }.sortedBy { Marks.parse(marks[it]).score }
+            CallFilter.BY_MARKS -> records.indices.filter { matchesMarks(it) }.let { hits ->
+                if (marksRule == MarksRule.BELOW) hits.sortedBy { Marks.parse(marks[it]).score }
+                else hits.sortedByDescending { Marks.parse(marks[it]).score }
+            }
             else -> records.indices.filter {
                 when (filter) {
                     CallFilter.NOT_CALLED -> records[it].outcome == CallOutcome.NOT_CALLED
@@ -99,8 +107,13 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         scheduleSave()
     }
 
-    fun updateLowBelow(text: String) {
-        lowBelow = text.filter { it.isDigit() || it == '.' }.take(6)
+    fun updateMarksRule(rule: MarksRule) {
+        marksRule = rule
+        scheduleSave()
+    }
+
+    fun updateThreshold(text: String) {
+        threshold = text.filter { it.isDigit() || it == '.' }.take(6)
         scheduleSave()
     }
 
@@ -143,7 +156,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         students = emptyList()
         records = emptyList()
         marks = emptyList()
-        lowBelow = ""
+        threshold = ""
+        marksRule = MarksRule.BELOW
         form = SessionForm()
         date = LocalDate.now()
         message = null
@@ -157,7 +171,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         students = session.students
         records = session.records
         marks = session.marks
-        lowBelow = session.lowBelow
+        threshold = session.threshold
+        marksRule = session.marksRule
         filter = CallFilter.ALL
         resumeIndex = SessionProgress.of(session.records).resumeIndex ?: 0
         screen = Screen.CALLING
@@ -186,7 +201,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun write() {
         val id = currentId ?: return
-        store.save(SavedSession(id, form, date, students, records, marks, lowBelow))
+        store.save(SavedSession(id, form, date, students, records, marks, threshold, marksRule))
     }
 
     private fun scheduleSave() {
@@ -250,11 +265,15 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (message == null) {
             if (currentId == null) currentId = UUID.randomUUID().toString()
-            filter = CallFilter.ALL
+            filter = if (hasMarks && marksReady) CallFilter.BY_MARKS else CallFilter.ALL
             resumeIndex = 0
             saveNow()
             screen = Screen.CALLING
         }
+    }
+
+    private fun hasValidContact(index: Int) = students[index].let { s ->
+        listOfNotNull(s.contact1, s.contact2).any { PhoneNumbers.isValid(it) }
     }
 
     fun updateRecord(index: Int, change: (CallRecord) -> CallRecord) {
@@ -274,7 +293,13 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
             date = date,
             teacher = form.teacher,
         )
-        reportText = ReportGenerator().generate(session, records).text
+        val scope = visibleIndices.sorted()
+        if (scope.isEmpty()) {
+            filterNotice = "No students in this view to report. Change the filter first."
+            return
+        }
+        reportScope = if (filter == CallFilter.ALL) null else "${scope.size} of ${records.size} students (${filter.label} filter)"
+        reportText = ReportGenerator().generate(session, scope.map { records[it].copy(contactMissing = !hasValidContact(it)) }).text
         screen = Screen.REPORT
     }
 }

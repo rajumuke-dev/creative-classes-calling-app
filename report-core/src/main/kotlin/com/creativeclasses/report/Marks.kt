@@ -1,5 +1,8 @@
 package com.creativeclasses.report
 
+/** Which side of the threshold the teacher wants to see. */
+enum class MarksRule(val label: String) { BELOW("Lower than"), ABOVE("Higher than") }
+
 enum class MarkKind { NONE, SCORED, ABSENT }
 
 data class Mark(val kind: MarkKind, val score: Double? = null)
@@ -19,9 +22,10 @@ object Marks {
     }
 
     /** Absent and blank students have no score to rank, so they are never "low". */
-    fun isLow(text: String?, below: Double?): Boolean {
+    fun matches(text: String?, rule: MarksRule, threshold: Double?): Boolean {
         val score = parse(text).score ?: return false
-        return below != null && score < below
+        if (threshold == null) return false
+        return if (rule == MarksRule.BELOW) score < threshold else score > threshold
     }
 
     fun isAbsent(text: String?) = parse(text).kind == MarkKind.ABSENT

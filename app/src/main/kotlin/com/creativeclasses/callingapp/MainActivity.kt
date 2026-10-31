@@ -11,8 +11,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
     private val vm: CallingViewModel by viewModels()
@@ -21,7 +25,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                Surface {
+                Surface(
+                    Modifier.background(Brush.verticalGradient(listOf(Color(0xFFE9E3FA), Color(0xFFF8F6FF), Color(0xFFDDE8FA)))),
+                    color = Color.Transparent,
+                ) {
                     BackHandler(enabled = vm.screen != Screen.DASHBOARD) {
                         if (vm.screen == Screen.REPORT) vm.screen = Screen.CALLING else vm.goToDashboard()
                     }

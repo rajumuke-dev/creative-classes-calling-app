@@ -18,12 +18,16 @@ class MarksTest {
     }
 
     @Test
-    fun `low means scored below the marks threshold`() {
-        assertTrue(Marks.isLow("19", 20.0))
-        assertFalse(Marks.isLow("20", 20.0))
-        assertFalse(Marks.isLow("AB", 20.0))
-        assertFalse(Marks.isLow("-", 20.0))
-        assertFalse(Marks.isLow("5", null))
+    fun `lower than and higher than are strict and ignore absent and blank`() {
+        assertTrue(Marks.matches("19", MarksRule.BELOW, 20.0))
+        assertFalse(Marks.matches("20", MarksRule.BELOW, 20.0))
+        assertTrue(Marks.matches("41", MarksRule.ABOVE, 40.0))
+        assertFalse(Marks.matches("40", MarksRule.ABOVE, 40.0))
+        for (rule in MarksRule.values()) {
+            assertFalse(Marks.matches("AB", rule, 20.0))
+            assertFalse(Marks.matches("-", rule, 20.0))
+            assertFalse(Marks.matches("5", rule, null))
+        }
     }
 
     @Test

@@ -28,7 +28,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -68,7 +69,7 @@ fun DashboardScreen(vm: CallingViewModel) {
                 }
             }
         }
-        Button(onClick = vm::newSession, Modifier.fillMaxWidth()) { Text("New Calling Session") }
+        Button(onClick = vm::newSession, Modifier.fillMaxWidth(), elevation = raisedButton()) { Text("New Calling Session") }
     }
 
     pendingDelete?.let { session ->
@@ -90,7 +91,11 @@ fun DashboardScreen(vm: CallingViewModel) {
 @Composable
 private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () -> Unit, onDelete: () -> Unit) {
     val p = SessionProgress.of(session.records)
-    Card(modifier.fillMaxWidth().animateContentSize()) {
+    ElevatedCard(
+        modifier.fillMaxWidth().animateContentSize(),
+        shape = CardShape,
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+    ) {
         Column(Modifier.padding(12.dp)) {
             Text(session.title, style = MaterialTheme.typography.titleSmall)
             Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
@@ -100,13 +105,13 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             )
-            Text("Contacted ${p.contacted} • Concern ${p.concerns} • No answer ${p.noAnswer} • Call later ${p.callLater}")
+            Text("Contacted ${p.contacted} • Concern ${p.concerns} • Call not received ${p.noAnswer} • Call later ${p.callLater}")
             Text("Not called ${p.notCalled} • Follow-ups ${p.followUps}")
             p.resumeIndex?.let {
                 Text("Next: ${session.records[it].studentName}", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
             } ?: Text("All students have been called.", Modifier.padding(top = 4.dp))
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpen) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }
+                Button(onClick = onOpen, elevation = raisedButton()) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }
                 OutlinedButton(onClick = onDelete) { Text("Delete") }
             }
         }

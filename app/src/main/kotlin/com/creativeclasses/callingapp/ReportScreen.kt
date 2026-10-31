@@ -1,6 +1,8 @@
 package com.creativeclasses.callingapp
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -24,19 +26,29 @@ import androidx.compose.ui.unit.dp
 fun ReportScreen(vm: CallingViewModel) {
     val context = LocalContext.current
     var editing by remember { mutableStateOf(false) }
+    val startVoice = rememberVoiceInput { spoken ->
+        vm.reportText = vm.reportText.trimEnd() + "\n" + spoken
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
         Text("Report Preview", style = MaterialTheme.typography.titleLarge)
+        vm.reportScope?.let { Text("Covers only $it.", style = MaterialTheme.typography.bodySmall) }
         OutlinedTextField(
             value = vm.reportText,
             onValueChange = { vm.reportText = it },
             readOnly = !editing,
             modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp),
         )
-        OutlinedButton(onClick = { editing = !editing }, Modifier.fillMaxWidth()) {
-            Text(if (editing) "Done Editing" else "Edit Report")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { editing = !editing }, Modifier.weight(1f)) {
+                Text(if (editing) "Done Editing" else "Edit Report")
+            }
+            OutlinedButton(onClick = {
+                editing = true
+                startVoice()
+            }, Modifier.weight(1f)) { Text("\uD83C\uDF99 Speak") }
         }
-        Button(onClick = { shareReport(context, vm.reportText) }, Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        Button(onClick = { shareReport(context, vm.reportText) }, Modifier.fillMaxWidth().padding(top = 8.dp), elevation = raisedButton()) {
             Text("Share on WhatsApp")
         }
     }

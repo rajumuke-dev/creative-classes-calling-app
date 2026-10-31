@@ -6,6 +6,7 @@ import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.CallingPurpose
 import com.creativeclasses.report.Concern
 import com.creativeclasses.report.ImportedStudent
+import com.creativeclasses.report.MarksRule
 import java.io.File
 import java.time.LocalDate
 import org.json.JSONArray
@@ -19,8 +20,9 @@ data class SavedSession(
     val records: List<CallRecord>,
     /** Marks text per student, parallel to [students]: "41", "AB", "-" or blank. */
     val marks: List<String>,
-    /** Students scoring below this many marks are "low". Blank until the teacher sets it. */
-    val lowBelow: String,
+    /** Marks threshold for the "By marks" filter. Blank until the teacher sets it. */
+    val threshold: String,
+    val marksRule: MarksRule,
 ) {
     val title: String
         get() = form.sessionName.ifBlank {
@@ -88,7 +90,8 @@ class SessionStore(context: Context) {
             }
         }))
         put("marks", JSONArray(s.marks))
-        put("lowBelow", s.lowBelow)
+        put("threshold", s.threshold)
+        put("marksRule", s.marksRule.name)
     }
 
     private fun decode(o: JSONObject): SavedSession {
@@ -120,7 +123,8 @@ class SessionStore(context: Context) {
             },
             marks = o.optJSONArray("marks")?.let { a -> (0 until a.length()).map { a.getString(it) } }
                 ?: List(o.getJSONArray("students").length()) { "" },
-            lowBelow = o.optString("lowBelow", ""),
+            threshold = o.optString("threshold", o.optString("lowBelow", "")),
+            marksRule = MarksRule.values().firstOrNull { it.name == o.optString("marksRule") } ?: MarksRule.BELOW,
         )
     }
 

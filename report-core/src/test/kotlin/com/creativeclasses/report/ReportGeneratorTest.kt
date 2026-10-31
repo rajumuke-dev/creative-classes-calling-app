@@ -69,11 +69,21 @@ class ReportGeneratorTest {
         assertEquals(ReportStatus.PARTIALLY_COMPLETED, report.status)
         assertContains(report.text, "Parent calling regarding the 8th CBSE examination results is in progress.")
         assertContains(report.text, "Parents Contacted: 21")
-        assertContains(report.text, "No Answer: 3")
+        assertContains(report.text, "Call Not Received: 3")
         assertContains(report.text, "Call Later: 1")
         assertContains(report.text, "Follow-ups Required: 4")
         assertContains(report.text, "4 parents require follow-up.")
         assertFalse(report.text.contains("completed"))
+    }
+
+    @Test
+    fun `student with no contact number is reported and keeps session incomplete`() {
+        val records = ok(2) + CallRecord("Asha Rao", CallOutcome.NOT_CALLED, contactMissing = true)
+        val text = generator.generate(session, records).text
+        assertContains(text, "Contact Not Found: 1")
+        assertContains(text, "Asha Rao\nContact number not found, so the parent could not be called. Follow-up call required.")
+        assertContains(text, "Partially Completed")
+        assertFalse(text.contains("Not Yet Called"))
     }
 
     @Test

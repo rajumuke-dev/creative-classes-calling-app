@@ -43,10 +43,14 @@ data class CallRecord(
     val concerns: Set<Concern> = emptySet(),
     val remark: String? = null,
     val followUpRequired: Boolean = false,
+    val contactMissing: Boolean = false,
 )
 
+/** No usable phone number was found in the imported sheet and the parent has not been reached another way. */
+fun CallRecord.noContact() = contactMissing && outcome == CallOutcome.NOT_CALLED
+
 fun CallRecord.needsFollowUp() =
-    followUpRequired || outcome == CallOutcome.NO_ANSWER || outcome == CallOutcome.CALL_LATER
+    followUpRequired || noContact() || outcome == CallOutcome.NO_ANSWER || outcome == CallOutcome.CALL_LATER
 
 enum class ReportStatus(val label: String) {
     NOT_STARTED("Not Started"),

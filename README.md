@@ -15,12 +15,12 @@ Android app for teachers to call parents from an Excel list, record outcomes and
 Sessions are saved on the phone after every change (private app storage, one JSON file per session). The
 dashboard lists every session with called / total, the outcome breakdown and the next student to call;
 "Continue calling" opens the list at the first student not yet called. The calling list can be filtered
-(All / Not called / Follow-up). No Answer and Call Later count as called (attempted).
+(All / Not called / Follow-up). Call Not Received and Call Later count as called (attempted).
 
-**Marks** (one subject per session): set the low-marks threshold (students scoring below that many marks are low), then type marks on
+**Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
 each card or use "Read marks from image" (on-device OCR, nothing is uploaded). Names are matched exactly, then
-by same words in any order, then by a unique close spelling. The "Low marks" filter lists scorers below the
-cut-off, lowest first; "Absent" lists AB. OCR can misread digits, so review the marks; the import notice lists
+by same words in any order, then by a unique close spelling. "By marks" lists scorers below (lowest first) or above (highest first) the
+mark; "Absent" lists AB. OCR can misread digits, so review the marks; the import notice lists
 unmatched names and students left without marks. Marks are never added to the report.
 
 ## Build
@@ -31,3 +31,5 @@ Requires JDK 17+ and an Android SDK (set `sdk.dir` in `local.properties`).
 ./gradlew :report-core:test
 ./gradlew :app:assembleDebug   # app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The report covers only the students in the active filter. Students with no valid phone number are listed as "Contact Not Found" follow-ups. Remarks can be dictated with Speak.
