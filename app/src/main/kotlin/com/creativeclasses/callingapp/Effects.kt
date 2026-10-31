@@ -37,7 +37,7 @@ import kotlin.math.abs
 import kotlin.math.sin
 import kotlin.random.Random
 
-enum class ReactionKind { CELEBRATE, SAD, VISIT, DANCE }
+enum class ReactionKind { CELEBRATE, SAD, VISIT, DANCE, CONCERN }
 
 /** A one-off full-screen reaction; a new [id] restarts it. */
 data class Reaction(val kind: ReactionKind, val id: Long = System.nanoTime()) {
@@ -84,6 +84,10 @@ fun ReactionOverlay(reaction: Reaction?, onDone: () -> Unit) {
     }
     if (reaction.kind == ReactionKind.DANCE) {
         key(reaction.id) { DanceParty(reaction.id, onDone) }
+        return
+    }
+    if (reaction.kind == ReactionKind.CONCERN) {
+        key(reaction.id) { Faaah(onDone) }
         return
     }
     key(reaction.id) {
@@ -205,6 +209,48 @@ private fun DanceParty(seed: Long, onDone: () -> Unit) {
     }
 }
 
+/**
+ * Meme-style dramatic zoom for a raised concern, timed to the long [Sounds.Cue.FAAAH] shout: 😱 punches in, the screen
+ * edges flush red and "FAAAHHH!" stretches out as the shout falls.
+ */
+@Composable
+private fun Faaah(onDone: () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(FAAAH_MS, easing = LinearEasing))
+        onDone()
+    }
+    val shout = { p: Float -> (1 - p * FAAAH_MS / SHOUT_MS).coerceIn(0f, 1f) }
+    val fade = { p: Float -> (if (p < 0.85f) 1f else (1 - p) / 0.15f).coerceIn(0f, 1f) }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val p = progress.value
+            drawRect(Brush.radialGradient(listOf(Color.Transparent, Color(0xFFDC2626).copy(alpha = 0.5f * shout(p) * fade(p))), center, size.maxDimension * 0.7f))
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.graphicsLayer { alpha = fade(progress.value) }) {
+            Text(
+                "\uD83D\uDE31",
+                Modifier.graphicsLayer {
+                    val s = shout(progress.value)
+                    scaleX = 0.8f + (1 - s) * 0.2f + s * 0.6f
+                    scaleY = scaleX
+                    rotationZ = sin(progress.value * 60) * 8 * s
+                },
+                fontSize = 96.sp,
+            )
+            Text(
+                "FAAAHHH!",
+                Modifier.padding(top = 8.dp).graphicsLayer { scaleX = 0.7f + (1 - shout(progress.value)) * 0.6f },
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFFDC2626),
+            )
+        }
+    }
+}
+
+private const val FAAAH_MS = 2000
+private const val SHOUT_MS = 1300f
 private const val DANCE_MS = 2600
 private const val BEAT_MS = 360f
 

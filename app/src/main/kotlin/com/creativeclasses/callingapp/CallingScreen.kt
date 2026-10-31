@@ -246,6 +246,8 @@ fun CallingScreen(vm: CallingViewModel) {
                                                 CallOutcome.CONTACTED -> Sounds.Cue.CELEBRATE
                                                 CallOutcome.NO_ANSWER -> Sounds.Cue.SAD
                                                 CallOutcome.WILL_VISIT -> Sounds.Cue.DOORBELL
+                                                CallOutcome.CONCERN_RAISED -> Sounds.Cue.FAAAH
+                                                CallOutcome.CALL_LATER -> Sounds.Cue.TICK_TOCK
                                                 else -> Sounds.Cue.SOFT
                                             },
                                         )
@@ -253,6 +255,7 @@ fun CallingScreen(vm: CallingViewModel) {
                                             CallOutcome.CONTACTED -> reaction = Reaction(ReactionKind.CELEBRATE)
                                             CallOutcome.NO_ANSWER -> reaction = Reaction(ReactionKind.SAD)
                                             CallOutcome.WILL_VISIT -> reaction = Reaction(ReactionKind.VISIT)
+                                            CallOutcome.CONCERN_RAISED -> reaction = Reaction(ReactionKind.CONCERN)
                                             else -> Unit
                                         }
                                     }
