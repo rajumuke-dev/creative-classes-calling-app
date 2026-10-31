@@ -172,6 +172,19 @@ fun CallingScreen(vm: CallingViewModel) {
                                 )
                             }
                         }
+                        AnimatedVisibility(record.outcome == CallOutcome.NO_ANSWER) {
+                            val reachable = listOfNotNull(vm.students[i].contact1, vm.students[i].contact2)
+                                .firstOrNull { PhoneNumbers.isValid(it) }
+                            if (reachable != null) {
+                                Button(
+                                    onClick = { messageParent(context, reachable, ParentMessage.notReached(record.studentName)) },
+                                    Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    elevation = raisedButton(),
+                                ) { Text("Send WhatsApp message to parent") }
+                            } else {
+                                Text("No valid phone number, so no WhatsApp message can be sent.", Modifier.padding(top = 8.dp))
+                            }
+                        }
                         AnimatedVisibility(record.outcome == CallOutcome.CONCERN_RAISED) {
                             ConcernChips(record) { c -> vm.updateRecord(i) { c(it) } }
                         }
@@ -186,13 +199,6 @@ fun CallingScreen(vm: CallingViewModel) {
                                 speakIndex = i
                                 startVoice()
                             }) { Text("\uD83C\uDF99 Speak") }
-                            val student = vm.students[i]
-                            val reachable = listOfNotNull(student.contact1, student.contact2).firstOrNull { PhoneNumbers.isValid(it) }
-                            if (record.outcome == CallOutcome.NO_ANSWER && reachable != null) {
-                                TextButton(onClick = {
-                                    messageParent(context, reachable, ParentMessage.notReached(record.studentName))
-                                }) { Text("WhatsApp parent") }
-                            }
                             Checkbox(
                                 checked = record.followUpRequired,
                                 onCheckedChange = { v -> vm.updateRecord(i) { it.copy(followUpRequired = v) } },
