@@ -47,7 +47,7 @@ data class SessionForm(
     val purpose: CallingPurpose = CallingPurpose.EXAM_RESULT,
     val customPurpose: String = "",
     val teacher: String = "",
-    /** When the teacher can take a call back, quoted in the text message to parents who were not reached. */
+    /** When the teacher is available, told to parents who were not reached in the pre-filled text message. */
     val availability: String = "",
 )
 

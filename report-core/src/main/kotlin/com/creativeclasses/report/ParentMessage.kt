@@ -1,19 +1,19 @@
 package com.creativeclasses.report
 
-/** Text pre-filled for the teacher when a parent did not pick up. The teacher reviews it and presses Send in the SMS app. */
+/** Text pre-filled for the admin when a parent did not pick up. The admin reviews it and presses Send in the SMS app. */
 object ParentMessage {
-    /** Signs as [teacher] when set, otherwise as the institute; adds when the parent can call back if [availability] is set. */
+    /** Sent on behalf of the institute; when [availability] is set, tells the parent when the [teacher] can be reached. */
     fun notReached(studentName: String, teacher: String = "", availability: String = "", organisation: String = "Creative Classes"): String {
         val about = studentName.tidy().ifEmpty { "your child" }
         val name = teacher.tidy()
         val hours = availability.tidy().trimEnd('.').replace(Regex("^available\\s*", RegexOption.IGNORE_CASE), "")
-        val (intro, callBack, available, signature) = if (name.isEmpty()) {
-            listOf("This is $organisation. We tried", "call us back", "We are available", organisation)
-        } else {
-            listOf("This is $name from $organisation. I tried", "call me back", "I am available", "$name\n$organisation")
+        val teacherLine = when {
+            hours.isEmpty() -> ""
+            name.isEmpty() -> "\n\nThe teacher is available $hours."
+            else -> "\n\nTeacher $name is available $hours."
         }
-        return "Dear Parent,\n\n$intro to call you regarding $about but could not reach you. Kindly $callBack at your convenience." +
-            (if (hours.isEmpty()) "" else " $available $hours.") + "\n\nThank you,\n$signature"
+        return "Dear Parent,\n\nThis is $organisation. We tried to call you regarding $about but could not reach you. " +
+            "Kindly call us back at your convenience.$teacherLine\n\nThank you,\n$organisation"
     }
 
     private fun String.tidy() = trim().replace(Regex("\\s+"), " ")

@@ -21,9 +21,9 @@ Student cards minimise once an outcome is recorded (Contacted, Will Come to Visi
 short pause; Concern Raised and Call Not Received via **Done ✓**) and show a coloured outcome badge, follow-up
 flag and remark preview. Tap a card heading to reopen it.
 For Call Not Received, **Send text message to parent** opens the SMS app with a pre-filled message (nothing is
-sent until you press Send). It is signed with the session's Teacher name and gives the "Teacher available" hours
-(e.g. "Mon to Sat, 4 PM to 7 PM") so the parent knows when to call back; both are set on the New Calling Session
-form and carry over from the most recent session.
+sent until you press Send). It comes from Creative Classes and tells the parent when the teacher is available
+(e.g. "Teacher Priya Sharma is available Mon to Sat, 4 PM to 7 PM."), using the Teacher and "Teacher available"
+fields of the New Calling Session form; both carry over from the most recent session.
 Short synthesised sounds and a brief full-screen animation mark outcomes: confetti and a "ta-da" for Contacted,
 a check-mark "visit booked" ripple and doorbell for Will Come to Visit, gentle rain and a falling tune for Call Not
 Received, one soft note for the others. When the last student in the list being called gets an outcome (the By marks / Absent
