@@ -118,6 +118,14 @@ fun CallingScreen(vm: CallingViewModel) {
                 )
             }
         }
+        if (vm.filter == CallFilter.BY_MARKS && vm.hasMarks && vm.studentsWithoutMarks.isNotEmpty()) {
+            Text(
+                "Not listed, no marks entered: " + vm.studentsWithoutMarks.joinToString(", ") +
+                    ". Enter their marks on the cards (All filter) to include them.",
+                Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         if (shown.isEmpty()) {
             val hint = if (vm.filter == CallFilter.BY_MARKS && !vm.marksReady) {
                 "Choose Lower than or Higher than and enter the marks above."

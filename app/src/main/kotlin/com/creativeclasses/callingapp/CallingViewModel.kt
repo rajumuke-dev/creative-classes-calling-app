@@ -83,6 +83,9 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     fun matchesMarks(index: Int) = Marks.matches(marks.getOrNull(index), marksRule, thresholdValue)
 
     val hasMarks get() = marks.any { it.isNotBlank() }
+    /** Students whose marks are blank can never match a marks filter, so the teacher is told who they are. */
+    val studentsWithoutMarks get() = students.indices.filter { marks.getOrNull(it).isNullOrBlank() }.map { students[it].name }
+
     val marksReady get() = thresholdValue != null
 
     /** Low marks are listed lowest score first so the weakest students are called first. */
