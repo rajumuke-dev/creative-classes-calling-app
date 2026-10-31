@@ -5,39 +5,67 @@ import java.io.InputStream
 import java.math.BigDecimal
 import java.util.zip.ZipInputStream
 
-/** Minimal, dependency-free reader for the first sheet of an .xlsx file. Returns rows of cell text. */
+/** A workbook read from an .xlsx file; [rows] returns the cell text of one sheet. */
+class XlsxWorkbook internal constructor(
+    val sheetNames: List<String>,
+    private val sheetXml: List<String>,
+    private val sharedStrings: List<String>,
+) {
+    fun rows(sheetIndex: Int): List<List<String>> = XlsxReader.parseRows(sheetXml[sheetIndex], sharedStrings)
+}
+
+/** Minimal, dependency-free .xlsx reader. */
 object XlsxReader {
     private const val MAX_ENTRY_BYTES = 20L * 1024 * 1024
+    private const val MAX_TOTAL_BYTES = 100L * 1024 * 1024
     private val SHARED_ITEM = Regex("<si\\b[^>]*>(.*?)</si>", RegexOption.DOT_MATCHES_ALL)
     private val TEXT = Regex("<t\\b[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL)
     private val ROW = Regex("<row\\b[^>]*?(?:/>|>(.*?)</row>)", RegexOption.DOT_MATCHES_ALL)
     private val CELL = Regex("<c\\s([^>]*?)(?:/>|>(.*?)</c>)", RegexOption.DOT_MATCHES_ALL)
     private val VALUE = Regex("<v>(.*?)</v>", RegexOption.DOT_MATCHES_ALL)
+    private val SHEET = Regex("<sheet\\s([^>]*?)/?>")
+    private val RELATIONSHIP = Regex("<Relationship\\s([^>]*?)/?>")
     private val ENTITY = Regex("&(#x[0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos);")
 
-    fun readRows(input: InputStream): List<List<String>> {
-        var shared: List<String> = emptyList()
-        var sheetName: String? = null
-        var sheetXml: String? = null
+    fun open(input: InputStream): XlsxWorkbook {
+        val entries = HashMap<String, String>()
+        val budget = longArrayOf(MAX_TOTAL_BYTES)
         ZipInputStream(input).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
                 val name = entry.name
-                if (name == "xl/sharedStrings.xml") {
-                    shared = SHARED_ITEM.findAll(readLimited(zip)).map { item ->
-                        TEXT.findAll(item.groupValues[1]).joinToString("") { unescape(it.groupValues[1]) }
-                    }.toList()
-                } else if (name.startsWith("xl/worksheets/sheet") && name.endsWith(".xml") &&
-                    (sheetName == null || name < sheetName!!)
-                ) {
-                    sheetName = name
-                    sheetXml = readLimited(zip)
-                }
+                val wanted = name == "xl/workbook.xml" || name == "xl/_rels/workbook.xml.rels" ||
+                    name == "xl/sharedStrings.xml" || (name.startsWith("xl/worksheets/") && name.endsWith(".xml"))
+                if (wanted) entries[name] = readLimited(zip, budget)
             }
         }
-        val xml = sheetXml ?: throw IllegalArgumentException("This is not a valid .xlsx Excel file.")
-        return ROW.findAll(xml).map { parseRow(it.groupValues[1], shared) }.toList()
+        val workbook = entries["xl/workbook.xml"] ?: throw IllegalArgumentException("This is not a valid .xlsx Excel file.")
+        val targets = RELATIONSHIP.findAll(entries["xl/_rels/workbook.xml.rels"].orEmpty()).mapNotNull {
+            val id = attr(it.groupValues[1], "Id")
+            val target = attr(it.groupValues[1], "Target")
+            if (id != null && target != null) id to target else null
+        }.toMap()
+
+        val names = mutableListOf<String>()
+        val xmls = mutableListOf<String>()
+        SHEET.findAll(workbook).forEach { m ->
+            val name = attr(m.groupValues[1], "name")?.let(::unescape) ?: return@forEach
+            val target = attr(m.groupValues[1], "r:id")?.let { targets[it] } ?: return@forEach
+            val path = target.trimStart('/').let { if (it.startsWith("xl/")) it else "xl/$it" }
+            val xml = entries[path] ?: return@forEach
+            names += name
+            xmls += xml
+        }
+        require(names.isNotEmpty()) { "No sheets were found in this Excel file." }
+
+        val shared = SHARED_ITEM.findAll(entries["xl/sharedStrings.xml"].orEmpty()).map { item ->
+            TEXT.findAll(item.groupValues[1]).joinToString("") { unescape(it.groupValues[1]) }
+        }.toList()
+        return XlsxWorkbook(names, xmls, shared)
     }
+
+    internal fun parseRows(xml: String, shared: List<String>): List<List<String>> =
+        ROW.findAll(xml).map { parseRow(it.groupValues[1], shared) }.toList()
 
     private fun parseRow(rowXml: String, shared: List<String>): List<String> {
         val cells = sortedMapOf<Int, String>()
@@ -58,7 +86,7 @@ object XlsxReader {
     }
 
     private fun attr(attrs: String, name: String) =
-        Regex("(?:^|\\s)$name=\"([^\"]*)\"").find(attrs)?.groupValues?.get(1)
+        Regex("(?:^|\\s)${Regex.escape(name)}=\"([^\"]*)\"").find(attrs)?.groupValues?.get(1)
 
     private fun columnIndex(ref: String): Int? {
         val letters = ref.takeWhile { it.isLetter() }.uppercase()
@@ -84,7 +112,7 @@ object XlsxReader {
         }
     }
 
-    private fun readLimited(zip: ZipInputStream): String {
+    private fun readLimited(zip: ZipInputStream, budget: LongArray): String {
         val out = ByteArrayOutputStream()
         val buf = ByteArray(8192)
         var total = 0L
@@ -92,7 +120,8 @@ object XlsxReader {
             val n = zip.read(buf)
             if (n < 0) break
             total += n
-            require(total <= MAX_ENTRY_BYTES) { "The Excel file is too large." }
+            budget[0] -= n
+            require(total <= MAX_ENTRY_BYTES && budget[0] >= 0) { "The Excel file is too large." }
             out.write(buf, 0, n)
         }
         return String(out.toByteArray(), Charsets.UTF_8)

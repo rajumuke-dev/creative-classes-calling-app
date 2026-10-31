@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.creativeclasses.report.PhoneNumbers
 
 private const val WHATSAPP_PACKAGE = "com.whatsapp"
 
@@ -21,8 +22,7 @@ fun shareReport(context: Context, text: String) {
 }
 
 fun dialPhone(context: Context, phone: String) {
-    val number = phone.filter { it.isDigit() || it == '+' }
-    if (number.isEmpty()) return
+    val number = PhoneNumbers.dialable(phone) ?: return
     try {
         context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")))
     } catch (e: ActivityNotFoundException) {

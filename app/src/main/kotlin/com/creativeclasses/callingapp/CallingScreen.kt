@@ -24,11 +24,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.content.Context
 import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.Concern
+import com.creativeclasses.report.PhoneNumbers
 
 private val OUTCOME_CHOICES = listOf(
     CallOutcome.CONTACTED to "Contacted",
@@ -60,10 +63,12 @@ fun CallingScreen(vm: CallingViewModel) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(record.studentName, style = MaterialTheme.typography.titleSmall)
-                                vm.students[i].phone?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                            }
-                            vm.students[i].phone?.let { phone ->
-                                TextButton(onClick = { dialPhone(context, phone) }) { Text("Call") }
+                                val student = vm.students[i]
+                                listOfNotNull(student.group, student.school).takeIf { it.isNotEmpty() }?.let {
+                                    Text(it.joinToString(" • "), style = MaterialTheme.typography.bodySmall)
+                                }
+                                ContactRow(context, "Contact 1", student.contact1)
+                                ContactRow(context, "Contact 2", student.contact2)
                             }
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -101,6 +106,21 @@ fun CallingScreen(vm: CallingViewModel) {
             onClick = vm::prepareReport,
             Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding(),
         ) { Text("Share Report") }
+    }
+}
+
+@Composable
+private fun ContactRow(context: Context, label: String, phone: String?) {
+    if (phone == null) return
+    val valid = PhoneNumbers.isValid(phone)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            if (valid) "$label: $phone" else "$label: $phone (invalid number)",
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (valid) Color.Unspecified else MaterialTheme.colorScheme.error,
+        )
+        if (valid) TextButton(onClick = { dialPhone(context, phone) }) { Text("Call") }
     }
 }
 

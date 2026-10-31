@@ -3,6 +3,9 @@ package com.creativeclasses.callingapp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -31,6 +35,7 @@ import java.util.Locale
 
 private const val XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SetupScreen(vm: CallingViewModel) {
     val context = LocalContext.current
@@ -51,6 +56,14 @@ fun SetupScreen(vm: CallingViewModel) {
             Text("Import Excel (.xlsx)")
         }
         vm.message?.let { Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
+        if (vm.sheetNames.size > 1) {
+            Text("Sheet", Modifier.padding(top = 8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                vm.sheetNames.forEachIndexed { i, name ->
+                    FilterChip(selected = vm.selectedSheet == i, onClick = { vm.selectSheet(i) }, label = { Text(name) })
+                }
+            }
+        }
         Spacer(Modifier.height(16.dp))
 
         Text("Calling Purpose")

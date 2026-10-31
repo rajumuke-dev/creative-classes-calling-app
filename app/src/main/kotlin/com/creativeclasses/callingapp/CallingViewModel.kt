@@ -13,6 +13,7 @@ import com.creativeclasses.report.ImportedStudent
 import com.creativeclasses.report.ReportGenerator
 import com.creativeclasses.report.StudentImporter
 import com.creativeclasses.report.XlsxReader
+import com.creativeclasses.report.XlsxWorkbook
 import java.io.InputStream
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -34,31 +35,54 @@ data class SessionForm(
 /** State is held in memory only: it survives rotation but not process death. */
 class CallingViewModel : ViewModel() {
     var screen by mutableStateOf(Screen.SETUP)
+    var sheetNames by mutableStateOf<List<String>>(emptyList())
+    var selectedSheet by mutableStateOf<Int?>(null)
     var students by mutableStateOf<List<ImportedStudent>>(emptyList())
     var records by mutableStateOf<List<CallRecord>>(emptyList())
     var form by mutableStateOf(SessionForm())
     var message by mutableStateOf<String?>(null)
     var reportText by mutableStateOf("")
     val date: LocalDate = LocalDate.now()
+    private var workbook: XlsxWorkbook? = null
 
     fun importFile(open: () -> InputStream?) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val stream = open() ?: throw IllegalArgumentException("Could not open the selected file.")
-                val result = stream.use { StudentImporter.fromRows(XlsxReader.readRows(it)) }
-                students = result.students
-                records = result.students.map { CallRecord(it.name, CallOutcome.NOT_CALLED) }
-                form = form.copy(
-                    className = result.className ?: form.className,
-                    board = result.board ?: form.board,
-                    exam = result.exam ?: form.exam,
-                )
-                message = "Imported ${result.students.size} students."
+                val wb = stream.use { XlsxReader.open(it) }
+                workbook = wb
+                sheetNames = wb.sheetNames.map { it.trim() }
+                selectedSheet = null
+                students = emptyList()
+                records = emptyList()
+                message = "Select the sheet to call."
+                if (wb.sheetNames.size == 1) loadSheet(0)
             } catch (e: IllegalArgumentException) {
                 message = e.message
             } catch (e: Exception) {
                 message = "Could not read this file. Please use an .xlsx Excel file."
             }
+        }
+    }
+
+    fun selectSheet(index: Int) {
+        viewModelScope.launch(Dispatchers.IO) { loadSheet(index) }
+    }
+
+    private fun loadSheet(index: Int) {
+        val wb = workbook ?: return
+        selectedSheet = index
+        try {
+            val list = StudentImporter.fromRows(wb.rows(index))
+            val info = StudentImporter.parseSheetName(wb.sheetNames[index])
+            students = list
+            records = list.map { CallRecord(it.name, CallOutcome.NOT_CALLED) }
+            form = form.copy(className = info.className.orEmpty(), board = info.board.orEmpty())
+            message = "${list.size} students loaded from '${sheetNames[index]}'."
+        } catch (e: IllegalArgumentException) {
+            students = emptyList()
+            records = emptyList()
+            message = e.message
         }
     }
 
