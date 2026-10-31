@@ -29,8 +29,8 @@ Short synthesised sounds and a brief full-screen animation mark outcomes: confet
 a check-mark "visit booked" ripple and doorbell for Will Come to Visit, gentle rain and a falling tune for Call Not
 Received, one soft note for the others. When the last student in the list being called gets an outcome (the By marks / Absent
 selection when that filter is on, otherwise the whole class), a short dance plays (dancers bouncing to a party
-tune under confetti); if it hasn't played yet, Share Report / Next play it before the preview opens, and a three-note chime when the report preview opens. They play as interface sounds and stay
-silent when the phone is on silent/vibrate or system "Touch sounds" is off.
+tune under confetti); if it hasn't played yet, Share Report / Next play it before the preview opens, and a three-note chime when the report preview opens. They play at the
+phone's media volume, like reels (the volume buttons control it inside the app; turn it down to mute the sounds).
 **4D cinema effects:** every sound is also felt — the phone vibrates on each note's beat (a strong impact pulse for
 Contacted, a "ding-dong" for Visit, soft long buzzes for Call Not Received, one pulse per dance beat), so reactions
 are still felt on vibrate. Big moments add a low "boom" under the sound, a short echo, a flash of light and a brief

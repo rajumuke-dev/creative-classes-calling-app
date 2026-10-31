@@ -18,9 +18,9 @@ import kotlin.math.sin
 
 /**
  * Short "4D cinema" cues, synthesised in code (no audio files): each note is felt as a vibration pulse at the same
- * moment it sounds, big moments get a low "boom" impact, and a short echo gives the sound some room. Sound is silenced
- * when the phone is on silent/vibrate or "Touch sounds" is off; vibration follows the system haptic setting and also
- * plays on vibrate.
+ * moment it sounds, big moments get a low "boom" impact, and a short echo gives the sound some room. Sound plays at the
+ * phone's media volume (like reels; turn media volume down to mute it); vibration follows the system haptic setting and
+ * also plays on vibrate.
  */
 object Sounds {
     /** Timbre: a struck bell, a brass horn, or a shouting voice ("aah" vowel). */
@@ -82,19 +82,12 @@ object Sounds {
 
     fun play(context: Context, cue: Cue) {
         feel(context, cue)
-        if (!enabled(context)) return
         runCatching {
             val track = tracks.computeIfAbsent(cue, ::build)
             track.stop()
             track.reloadStaticData()
             track.play()
         }
-    }
-
-    private fun enabled(context: Context): Boolean {
-        val audio = context.getSystemService(AudioManager::class.java) ?: return false
-        return audio.ringerMode == AudioManager.RINGER_MODE_NORMAL &&
-            Settings.System.getInt(context.contentResolver, Settings.System.SOUND_EFFECTS_ENABLED, 1) != 0
     }
 
     /** One vibration pulse per note, on the note's beat; the first pulse is longer on impact cues. */
@@ -129,7 +122,7 @@ object Sounds {
         return AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_GAME)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build(),
             )
