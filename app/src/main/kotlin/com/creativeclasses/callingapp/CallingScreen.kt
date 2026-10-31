@@ -1,6 +1,14 @@
 package com.creativeclasses.callingapp
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -54,6 +62,7 @@ fun CallingScreen(vm: CallingViewModel) {
     val progress = SessionProgress.of(vm.records)
     val shown = vm.visibleIndices
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = vm.resumeIndex)
+    var showMarks by remember { mutableStateOf(false) }
     val bar by animateFloatAsState(if (progress.total == 0) 0f else progress.attempted.toFloat() / progress.total, label = "progress")
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
@@ -64,6 +73,7 @@ fun CallingScreen(vm: CallingViewModel) {
                 Modifier.weight(1f),
                 style = MaterialTheme.typography.titleMedium,
             )
+            TextButton(onClick = { showMarks = true }) { Text("Marks") }
         }
         LinearProgressIndicator(progress = { bar }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
         FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -71,7 +81,14 @@ fun CallingScreen(vm: CallingViewModel) {
                 FilterChip(selected = vm.filter == f, onClick = { vm.filter = f }, label = { Text(f.label) })
             }
         }
-        if (shown.isEmpty()) Text("No students in this view.", Modifier.padding(16.dp))
+        if (shown.isEmpty()) {
+            val hint = if (vm.filter == CallFilter.LOW_MARKS && !vm.marksReady) {
+                "Open Marks and enter the total marks (Out of) to find low scorers."
+            } else {
+                "No students in this view."
+            }
+            Text(hint, Modifier.padding(16.dp))
+        }
         LazyColumn(
             Modifier.weight(1f),
             state = listState,
@@ -92,6 +109,14 @@ fun CallingScreen(vm: CallingViewModel) {
                                 ContactRow(context, "Contact 1", student.contact1)
                                 ContactRow(context, "Contact 2", student.contact2)
                             }
+                            OutlinedTextField(
+                                value = vm.marks.getOrElse(i) { "" },
+                                onValueChange = { vm.setMark(i, it) },
+                                label = { Text("Marks") },
+                                singleLine = true,
+                                isError = vm.isLow(i),
+                                modifier = Modifier.width(96.dp),
+                            )
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OUTCOME_CHOICES.forEach { (outcome, label) ->
@@ -131,6 +156,7 @@ fun CallingScreen(vm: CallingViewModel) {
             Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding(),
         ) { Text("Share Report") }
     }
+    if (showMarks) MarksDialog(vm) { showMarks = false }
 }
 
 @Composable
@@ -161,5 +187,51 @@ private fun ConcernChips(record: CallRecord, update: ((CallRecord) -> CallRecord
                 label = { Text(concern.phrase.replaceFirstChar { it.uppercase() }) },
             )
         }
+    }
+}
+
+@Composable
+private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.importMarksImage(uri)
+    }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Marks") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = vm.maxMarks,
+                    onValueChange = vm::updateMaxMarks,
+                    label = { Text("Out of (total marks)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = vm.cutoff,
+                    onValueChange = vm::updateCutoff,
+                    label = { Text("Low marks: below % of total") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth().padding(top = 12.dp)) {
+                    Text("Read marks from image")
+                }
+                Text(
+                    "Type AB for absent. Absent and blank students are not counted as low marks. Marks are not added to the report.",
+                    Modifier.padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Done") } },
+    )
+    vm.marksNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = { vm.marksNotice = null },
+            title = { Text("Marks from image") },
+            text = { Text(notice) },
+            confirmButton = { TextButton(onClick = { vm.marksNotice = null }) { Text("OK") } },
+        )
     }
 }

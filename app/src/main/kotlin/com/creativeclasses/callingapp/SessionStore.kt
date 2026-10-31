@@ -11,12 +11,18 @@ import java.time.LocalDate
 import org.json.JSONArray
 import org.json.JSONObject
 
+const val DEFAULT_CUTOFF = "40"
+
 data class SavedSession(
     val id: String,
     val form: SessionForm,
     val date: LocalDate,
     val students: List<ImportedStudent>,
     val records: List<CallRecord>,
+    /** Marks text per student, parallel to [students]: "41", "AB", "-" or blank. */
+    val marks: List<String>,
+    val maxMarks: String,
+    val cutoff: String,
 ) {
     val title: String
         get() = form.sessionName.ifBlank {
@@ -83,6 +89,9 @@ class SessionStore(context: Context) {
                 put("followUp", r.followUpRequired)
             }
         }))
+        put("marks", JSONArray(s.marks))
+        put("maxMarks", s.maxMarks)
+        put("cutoff", s.cutoff)
     }
 
     private fun decode(o: JSONObject): SavedSession {
@@ -112,6 +121,10 @@ class SessionStore(context: Context) {
                     followUpRequired = r.getBoolean("followUp"),
                 )
             },
+            marks = o.optJSONArray("marks")?.let { a -> (0 until a.length()).map { a.getString(it) } }
+                ?: List(o.getJSONArray("students").length()) { "" },
+            maxMarks = o.optString("maxMarks", ""),
+            cutoff = o.optString("cutoff", DEFAULT_CUTOFF),
         )
     }
 

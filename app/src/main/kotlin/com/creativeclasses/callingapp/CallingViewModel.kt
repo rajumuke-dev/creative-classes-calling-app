@@ -11,12 +11,16 @@ import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.CallingPurpose
 import com.creativeclasses.report.CallingSession
 import com.creativeclasses.report.ImportedStudent
+import com.creativeclasses.report.MarkRowParser
+import com.creativeclasses.report.Marks
+import com.creativeclasses.report.NameMatcher
 import com.creativeclasses.report.ReportGenerator
 import com.creativeclasses.report.SessionProgress
 import com.creativeclasses.report.needsFollowUp
 import com.creativeclasses.report.StudentImporter
 import com.creativeclasses.report.XlsxReader
 import com.creativeclasses.report.XlsxWorkbook
+import android.net.Uri
 import java.io.InputStream
 import java.time.LocalDate
 import java.util.UUID
@@ -28,7 +32,9 @@ import kotlinx.coroutines.withContext
 
 enum class Screen { DASHBOARD, SETUP, CALLING, REPORT }
 
-enum class CallFilter(val label: String) { ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up") }
+enum class CallFilter(val label: String) {
+    ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up"), LOW_MARKS("Low marks"), ABSENT("Absent")
+}
 
 data class SessionForm(
     val sessionName: String = "",
@@ -54,6 +60,10 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     var selectedSheet by mutableStateOf<Int?>(null)
     var students by mutableStateOf<List<ImportedStudent>>(emptyList())
     var records by mutableStateOf<List<CallRecord>>(emptyList())
+    var marks by mutableStateOf<List<String>>(emptyList())
+    var maxMarks by mutableStateOf("")
+    var cutoff by mutableStateOf(DEFAULT_CUTOFF)
+    var marksNotice by mutableStateOf<String?>(null)
     var form by mutableStateOf(SessionForm())
     var message by mutableStateOf<String?>(null)
     var reportText by mutableStateOf("")
@@ -64,14 +74,69 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         refreshSessions()
     }
 
+    private val maxMarksValue get() = maxMarks.trim().toDoubleOrNull()?.takeIf { it > 0 && it.isFinite() }
+    private val cutoffValue get() = cutoff.trim().toDoubleOrNull()?.takeIf { it in 0.0..100.0 } ?: DEFAULT_CUTOFF.toDouble()
+
+    fun isLow(index: Int) = Marks.isLow(marks.getOrNull(index), maxMarksValue, cutoffValue)
+
+    val hasMarks get() = marks.any { it.isNotBlank() }
+    val marksReady get() = maxMarksValue != null
+
+    /** Low marks are listed lowest score first so the weakest students are called first. */
     val visibleIndices: List<Int>
-        get() = records.indices.filter {
-            when (filter) {
-                CallFilter.ALL -> true
-                CallFilter.NOT_CALLED -> records[it].outcome == CallOutcome.NOT_CALLED
-                CallFilter.FOLLOW_UP -> records[it].needsFollowUp()
+        get() = when (filter) {
+            CallFilter.LOW_MARKS -> records.indices.filter { isLow(it) }.sortedBy { Marks.parse(marks[it]).score }
+            else -> records.indices.filter {
+                when (filter) {
+                    CallFilter.NOT_CALLED -> records[it].outcome == CallOutcome.NOT_CALLED
+                    CallFilter.FOLLOW_UP -> records[it].needsFollowUp()
+                    CallFilter.ABSENT -> Marks.isAbsent(marks.getOrNull(it))
+                    else -> true
+                }
             }
         }
+
+    fun setMark(index: Int, text: String) {
+        marks = marks.toMutableList().also { it[index] = text.take(8) }
+        scheduleSave()
+    }
+
+    fun updateMaxMarks(text: String) {
+        maxMarks = text.filter { it.isDigit() || it == '.' }.take(6)
+        scheduleSave()
+    }
+
+    fun updateCutoff(text: String) {
+        cutoff = text.filter { it.isDigit() || it == '.' }.take(5)
+        scheduleSave()
+    }
+
+    fun importMarksImage(uri: Uri) {
+        viewModelScope.launch {
+            marksNotice = try {
+                val lines = withContext(Dispatchers.IO) { MarksOcr.readRows(getApplication(), uri) }
+                val rows = MarkRowParser.parse(lines)
+                val result = NameMatcher.match(rows, students.map { it.name })
+                marks = marks.toMutableList().also { m -> result.matched.forEach { (i, v) -> m[i] = v } }
+                scheduleSave()
+                buildString {
+                    append("Marks filled for ${result.matched.size} of ${students.size} students (${rows.size} rows read from the image).")
+                    if (result.unmatched.isNotEmpty()) {
+                        append("\n\nCould not match these names, please enter their marks on the student cards:\n")
+                        append(result.unmatched.joinToString("\n") { "${it.name} (${it.marks})" })
+                    }
+                    val missing = students.indices.filter { it !in result.matched }
+                    if (missing.isNotEmpty()) {
+                        append("\n\nNo marks found for: ")
+                        append(missing.joinToString(", ") { students[it].name })
+                    }
+                    if (result.matched.isEmpty()) append("\n\nNo marks could be read. Try a clearer, straight-on image.")
+                }
+            } catch (e: Exception) {
+                "Could not read this image."
+            }
+        }
+    }
 
     fun refreshSessions() {
         viewModelScope.launch { sessions = withContext(Dispatchers.IO) { store.list() } }
@@ -84,6 +149,9 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         selectedSheet = null
         students = emptyList()
         records = emptyList()
+        marks = emptyList()
+        maxMarks = ""
+        cutoff = DEFAULT_CUTOFF
         form = SessionForm()
         date = LocalDate.now()
         message = null
@@ -96,6 +164,9 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         date = session.date
         students = session.students
         records = session.records
+        marks = session.marks
+        maxMarks = session.maxMarks
+        cutoff = session.cutoff
         filter = CallFilter.ALL
         resumeIndex = SessionProgress.of(session.records).resumeIndex ?: 0
         screen = Screen.CALLING
@@ -124,7 +195,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun write() {
         val id = currentId ?: return
-        store.save(SavedSession(id, form, date, students, records))
+        store.save(SavedSession(id, form, date, students, records, marks, maxMarks, cutoff))
     }
 
     private fun scheduleSave() {
@@ -145,6 +216,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
                 selectedSheet = null
                 students = emptyList()
                 records = emptyList()
+                marks = emptyList()
                 message = "Select the sheet to call."
                 if (wb.sheetNames.size == 1) loadSheet(0)
             } catch (e: IllegalArgumentException) {
@@ -167,11 +239,13 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
             val info = StudentImporter.parseSheetName(wb.sheetNames[index])
             students = list
             records = list.map { CallRecord(it.name, CallOutcome.NOT_CALLED) }
+            marks = List(list.size) { "" }
             form = form.copy(className = info.className.orEmpty(), board = info.board.orEmpty())
             message = "${list.size} students loaded from '${sheetNames[index]}'."
         } catch (e: IllegalArgumentException) {
             students = emptyList()
             records = emptyList()
+            marks = emptyList()
             message = e.message
         }
     }
