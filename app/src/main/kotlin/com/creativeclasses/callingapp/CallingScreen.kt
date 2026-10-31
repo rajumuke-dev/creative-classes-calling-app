@@ -15,6 +15,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.StrokeCap
@@ -70,6 +77,9 @@ import com.creativeclasses.report.ParentMessage
 import com.creativeclasses.report.PhoneNumbers
 import com.creativeclasses.report.SessionProgress
 
+/** Outcomes that need nothing more, so the card minimises itself once chosen. */
+private val AUTO_COLLAPSE = setOf(CallOutcome.CONTACTED, CallOutcome.WILL_VISIT, CallOutcome.CALL_LATER)
+
 private val OUTCOME_CHOICES = listOf(
     CallOutcome.CONTACTED to "Contacted",
     CallOutcome.CONCERN_RAISED to "Concern Raised",
@@ -87,6 +97,8 @@ fun CallingScreen(vm: CallingViewModel) {
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = vm.resumeIndex)
     var showMarks by remember { mutableStateOf(false) }
     var speakIndex by remember { mutableStateOf<Int?>(null) }
+    val opened = remember { mutableStateMapOf<Int, Boolean>() }
+    val scope = rememberCoroutineScope()
     val startVoice = rememberVoiceInput { spoken ->
         speakIndex?.let { i -> vm.updateRecord(i) { it.copy(remark = appendSpoken(it.remark, spoken)) } }
         speakIndex = null
@@ -170,13 +182,25 @@ fun CallingScreen(vm: CallingViewModel) {
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 ) {
                     Column(Modifier.fillMaxWidth().background(CardSheen).liveGlare().drawBehind { drawRect(accent, size = Size(6.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        val expanded = opened[i] ?: (record.outcome == CallOutcome.NOT_CALLED)
+                        val caret by animateFloatAsState(if (expanded) 180f else 0f, label = "caret")
+                        val student = vm.students[i]
+                        Row(
+                            Modifier.fillMaxWidth().clickable(onClickLabel = if (expanded) "Collapse" else "Expand") { opened[i] = !expanded },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Column(Modifier.weight(1f)) {
                                 Text(record.studentName, style = MaterialTheme.typography.titleSmall)
-                                val student = vm.students[i]
                                 listOfNotNull(student.group, student.school).takeIf { it.isNotEmpty() }?.let {
                                     Text(it.joinToString(" • "), style = MaterialTheme.typography.bodySmall)
                                 }
+                                if (!expanded) CollapsedSummary(record)
+                            }
+                            Text("\u25BE", Modifier.padding(start = 8.dp).rotate(caret), style = MaterialTheme.typography.titleLarge)
+                        }
+                        AnimatedVisibility(expanded) { Column {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
                                 ContactRow(context, "Contact 1", student.contact1)
                                 ContactRow(context, "Contact 2", student.contact2)
                             }
@@ -192,8 +216,15 @@ fun CallingScreen(vm: CallingViewModel) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OUTCOME_CHOICES.forEach { (outcome, label) ->
                                 OutcomeChip(outcome, label, record.outcome == outcome) {
-                                    vm.updateRecord(i) {
-                                        it.copy(outcome = if (it.outcome == outcome) CallOutcome.NOT_CALLED else outcome)
+                                    val chosen = if (record.outcome == outcome) CallOutcome.NOT_CALLED else outcome
+                                    vm.updateRecord(i) { it.copy(outcome = chosen) }
+                                    if (chosen in AUTO_COLLAPSE) {
+                                        scope.launch {
+                                            delay(700)
+                                            if (vm.records[i].outcome == chosen) opened[i] = false
+                                        }
+                                    } else {
+                                        if (chosen == CallOutcome.NOT_CALLED) opened.remove(i) else opened[i] = true
                                     }
                                 }
                             }
@@ -229,8 +260,12 @@ fun CallingScreen(vm: CallingViewModel) {
                                 checked = record.followUpRequired,
                                 onCheckedChange = { v -> vm.updateRecord(i) { it.copy(followUpRequired = v) } },
                             )
-                            Text("Follow-up required")
+                            Text("Follow-up required", Modifier.weight(1f))
+                            if (record.outcome != CallOutcome.NOT_CALLED) {
+                                TextButton(onClick = { opened[i] = false }) { Text("Done \u2713") }
+                            }
                         }
+                        } }
                     }
                 }
             }
@@ -249,6 +284,30 @@ fun CallingScreen(vm: CallingViewModel) {
             confirmButton = { TextButton(onClick = { vm.filterNotice = null }) { Text("OK") } },
         )
     }
+}
+
+/** One-line preview shown on a minimised card: coloured outcome badge, follow-up flag and the remark. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CollapsedSummary(record: CallRecord) {
+    FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val label = OUTCOME_CHOICES.firstOrNull { it.first == record.outcome }?.second
+        if (label != null) Badge(label, outcomeColor(record.outcome))
+        if (record.followUpRequired) Badge("Follow-up", MaterialTheme.colorScheme.tertiary)
+    }
+    record.remark?.takeIf { it.isNotBlank() }?.let {
+        Text(it, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun Badge(text: String, color: Color) {
+    Text(
+        text,
+        Modifier.background(color, CircleShape).padding(horizontal = 10.dp, vertical = 3.dp),
+        color = Color.White,
+        style = MaterialTheme.typography.labelMedium,
+    )
 }
 
 /** Outcome chip that fills with its outcome colour and gives a springy bounce when chosen. */

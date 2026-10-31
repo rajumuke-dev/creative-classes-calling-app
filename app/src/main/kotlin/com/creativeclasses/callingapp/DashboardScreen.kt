@@ -45,7 +45,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.SessionProgress
+import androidx.compose.foundation.shape.RoundedCornerShape
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -95,9 +97,13 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
         Column(Modifier.fillMaxWidth().background(CardSheen).liveGlare().padding(14.dp)) {
-            Text(session.title, style = MaterialTheme.typography.titleSmall)
-            Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
-            AnimatedCount("Called ${p.attempted} / ${p.total}", Modifier.padding(top = 8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(session.title, style = MaterialTheme.typography.titleSmall)
+                    Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
+                }
+                AnimatedCount("${p.attempted} / ${p.total} called")
+            }
             val progress by animateFloatAsState(if (p.total == 0) 0f else p.attempted.toFloat() / p.total, label = "progress")
             LinearProgressIndicator(
                 progress = { progress },
@@ -105,14 +111,46 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
                 trackColor = MaterialTheme.colorScheme.primaryContainer,
                 strokeCap = StrokeCap.Round,
             )
-            Text("Contacted ${p.contacted} • Concern ${p.concerns} • Will visit ${p.willVisit} • Call not received ${p.noAnswer} • Call later ${p.callLater}")
-            Text("Not called ${p.notCalled} • Follow-ups ${p.followUps}")
-            p.resumeIndex?.let {
-                Text("Next: ${session.records[it].studentName}", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
-            } ?: Text("All students have been called.", Modifier.padding(top = 4.dp))
-            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpen, elevation = raisedButton()) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }
+            StatRow(
+                StatTile(p.contacted, "Contacted", CallOutcome.CONTACTED),
+                StatTile(p.concerns, "Concern", CallOutcome.CONCERN_RAISED),
+                StatTile(p.willVisit, "Will visit", CallOutcome.WILL_VISIT),
+            )
+            StatRow(
+                StatTile(p.noAnswer, "Not received", CallOutcome.NO_ANSWER),
+                StatTile(p.callLater, "Call later", CallOutcome.CALL_LATER),
+                StatTile(p.notCalled, "Not called", CallOutcome.NOT_CALLED),
+            )
+            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    p.resumeIndex?.let { "Next: ${session.records[it].studentName}" } ?: "All students have been called.",
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("Follow-ups ${p.followUps}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+            }
+            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onOpen, Modifier.weight(1f), elevation = raisedButton()) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }
                 OutlinedButton(onClick = onDelete) { Text("Delete") }
+            }
+        }
+    }
+}
+
+private class StatTile(val value: Int, val label: String, val outcome: CallOutcome)
+
+/** Three equal-width count tiles, tinted with the outcome colour used on the calling screen. */
+@Composable
+private fun StatRow(vararg tiles: StatTile) {
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        tiles.forEach { t ->
+            val color = outcomeColor(t.outcome)
+            Column(
+                Modifier.weight(1f).background(color.copy(alpha = 0.12f), RoundedCornerShape(12.dp)).padding(vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("${t.value}", style = MaterialTheme.typography.titleMedium, color = color)
+                Text(t.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
             }
         }
     }

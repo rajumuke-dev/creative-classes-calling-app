@@ -16,6 +16,9 @@ Sessions are saved on the phone after every change (private app storage, one JSO
 dashboard lists every session with called / total, the outcome breakdown and the next student to call;
 "Continue calling" opens the list at the first student not yet called. The calling list can be filtered
 (All / Not called / Follow-up). Call Not Received and Call Later count as called (attempted).
+Student cards minimise once an outcome is recorded (Contacted, Will Come to Visit and Call Later after a
+short pause; Concern Raised and Call Not Received via **Done ✓**) and show a coloured outcome badge, follow-up
+flag and remark preview. Tap a card heading to reopen it.
 
 **Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
 each card or use "Read marks from image" (on-device OCR, nothing is uploaded). Names are matched exactly, then
