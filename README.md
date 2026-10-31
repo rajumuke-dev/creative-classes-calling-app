@@ -22,8 +22,9 @@ short pause; Concern Raised and Call Not Received via **Done ✓**) and show a c
 flag and remark preview. Tap a card heading to reopen it.
 For Call Not Received, **Send text message to parent** opens the SMS app with a pre-filled message (nothing is
 sent until you press Send). It comes from Creative Classes and tells the parent when the teacher is available
-(e.g. "Teacher Priya Sharma is available Mon to Sat, 4 PM to 7 PM."), using the Teacher and "Teacher available"
-fields of the New Calling Session form; both carry over from the most recent session.
+(e.g. "Priya Sharma is available on Monday from 4 PM to 7 PM. Please do visit the class."), using the Teacher and
+"Teacher available" fields of the New Calling Session form; both carry over from the most recent session. If a
+session has no availability yet, Send text message asks for it first; tap the availability line to change it.
 Short synthesised sounds and a brief full-screen animation mark outcomes: confetti and a "ta-da" for Contacted,
 a check-mark "visit booked" ripple and doorbell for Will Come to Visit, gentle rain and a falling tune for Call Not
 Received, one soft note for the others. When the last student in the list being called gets an outcome (the By marks / Absent

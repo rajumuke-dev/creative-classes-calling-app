@@ -99,6 +99,8 @@ fun CallingScreen(vm: CallingViewModel) {
     var speakIndex by remember { mutableStateOf<Int?>(null) }
     val opened = remember { mutableStateMapOf<Int, Boolean>() }
     var reaction by remember { mutableStateOf<Reaction?>(null) }
+    /** Teacher details dialog; runs the stored action (e.g. open the text message) after saving. */
+    var teacherDialog by remember { mutableStateOf<(() -> Unit)?>(null) }
     val scope = rememberCoroutineScope()
     val startVoice = rememberVoiceInput { spoken ->
         speakIndex?.let { i -> vm.updateRecord(i) { it.copy(remark = appendSpoken(it.remark, spoken)) } }
@@ -269,11 +271,21 @@ fun CallingScreen(vm: CallingViewModel) {
                             val reachable = listOfNotNull(vm.students[i].contact1, vm.students[i].contact2)
                                 .firstOrNull { PhoneNumbers.isValid(it) }
                             if (reachable != null) {
-                                Button(
-                                    onClick = { textParent(context, reachable, ParentMessage.notReached(record.studentName, vm.form.teacher, vm.form.availability)) },
-                                    Modifier.fillMaxWidth().padding(top = 8.dp),
-                                    elevation = raisedButton(),
-                                ) { Text("Send text message to parent") }
+                                val sendText = {
+                                    textParent(context, reachable, ParentMessage.notReached(record.studentName, vm.form.teacher, vm.form.availability))
+                                }
+                                Column {
+                                    Button(
+                                        onClick = { if (vm.form.availability.isBlank()) teacherDialog = sendText else sendText() },
+                                        Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        elevation = raisedButton(),
+                                    ) { Text("Send text message to parent") }
+                                    if (vm.form.availability.isNotBlank()) {
+                                        TextButton(onClick = { teacherDialog = {} }) {
+                                            Text("${vm.form.teacher.ifBlank { "Teacher" }} available ${vm.form.availability} \u270E")
+                                        }
+                                    }
+                                }
                             } else {
                                 Text("No valid phone number, so no text message can be sent.", Modifier.padding(top = 8.dp))
                             }
@@ -311,6 +323,13 @@ fun CallingScreen(vm: CallingViewModel) {
             Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding().tiltOnTouch(8f),
             elevation = raisedButton(),
         ) { Text("Share Report") }
+    }
+    teacherDialog?.let { after ->
+        TeacherAvailabilityDialog(vm.form, onDismiss = { teacherDialog = null }) { teacher, availability ->
+            vm.updateTeacher(teacher, availability)
+            teacherDialog = null
+            after()
+        }
     }
     ReactionOverlay(reaction) {
         val thenReport = reaction?.kind == ReactionKind.DANCE && reportAfterDance
@@ -437,4 +456,30 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
             confirmButton = { TextButton(onClick = { vm.marksNotice = null }) { Text("OK") } },
         )
     }
+}
+
+/** Teacher name and when the teacher is available, told to parents who were not reached; saved with the session. */
+@Composable
+private fun TeacherAvailabilityDialog(form: SessionForm, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+    var teacher by remember { mutableStateOf(form.teacher) }
+    var availability by remember { mutableStateOf(form.availability) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Teacher availability") },
+        text = {
+            Column {
+                Text("Included in the text message so the parent knows when to visit the class.")
+                OutlinedTextField(
+                    teacher, { teacher = it }, Modifier.holdsBreak().fillMaxWidth().padding(top = 8.dp),
+                    label = { Text("Teacher") }, singleLine = true,
+                )
+                OutlinedTextField(
+                    availability, { availability = it }, Modifier.holdsBreak().fillMaxWidth().padding(top = 8.dp),
+                    label = { Text("Available (e.g. on Monday from 4 PM to 7 PM)") }, singleLine = true,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(teacher, availability) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }

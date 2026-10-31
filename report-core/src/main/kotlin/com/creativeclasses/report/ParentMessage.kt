@@ -9,8 +9,8 @@ object ParentMessage {
         val hours = availability.tidy().trimEnd('.').replace(Regex("^available\\s*", RegexOption.IGNORE_CASE), "")
         val teacherLine = when {
             hours.isEmpty() -> ""
-            name.isEmpty() -> "\n\nThe teacher is available $hours."
-            else -> "\n\nTeacher $name is available $hours."
+            name.isEmpty() -> "\n\nThe teacher is available $hours. Please do visit the class."
+            else -> "\n\n$name is available $hours. Please do visit the class."
         }
         return "Dear Parent,\n\nThis is $organisation. We tried to call you regarding $about but could not reach you. " +
             "Kindly call us back at your convenience.$teacherLine\n\nThank you,\n$organisation"

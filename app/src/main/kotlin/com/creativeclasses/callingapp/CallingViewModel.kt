@@ -119,6 +119,11 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         scheduleSave()
     }
 
+    fun updateTeacher(teacher: String, availability: String) {
+        form = form.copy(teacher = teacher.trim(), availability = availability.trim())
+        scheduleSave()
+    }
+
     fun updateMarksRule(rule: MarksRule) {
         marksRule = rule
         scheduleSave()

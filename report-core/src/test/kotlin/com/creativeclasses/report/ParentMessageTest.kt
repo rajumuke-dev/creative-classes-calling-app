@@ -22,16 +22,16 @@ class ParentMessageTest {
     fun `admin message tells when the teacher is available`() {
         assertEquals(
             "Dear Parent,\n\nThis is Creative Classes. We tried to call you regarding Asha Rao but could not reach you. " +
-                "Kindly call us back at your convenience.\n\nTeacher Priya Sharma is available Mon to Sat, 4 PM to 7 PM." +
+                "Kindly call us back at your convenience.\n\nPriya Sharma is available on Monday from 4 PM to 7 PM. Please do visit the class." +
                 "\n\nThank you,\nCreative Classes",
-            ParentMessage.notReached("Asha Rao", teacher = " Priya  Sharma ", availability = " Mon to Sat, 4 PM to 7 PM. "),
+            ParentMessage.notReached("Asha Rao", teacher = " Priya  Sharma ", availability = " on Monday from 4 PM to 7 PM. "),
         )
     }
 
     @Test
     fun `availability without teacher name`() {
         val text = ParentMessage.notReached("Asha Rao", availability = "Available 10 AM to 1 PM")
-        assertContains(text, "convenience.\n\nThe teacher is available 10 AM to 1 PM.\n\nThank you,\nCreative Classes")
+        assertContains(text, "convenience.\n\nThe teacher is available 10 AM to 1 PM. Please do visit the class.\n\nThank you,\nCreative Classes")
     }
 
     @Test
