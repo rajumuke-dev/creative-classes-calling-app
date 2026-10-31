@@ -16,19 +16,24 @@ import kotlin.math.sin
  * silenced when the phone is on silent/vibrate or the system "Touch sounds" setting is off.
  */
 object Sounds {
-    enum class Cue(val notes: DoubleArray) {
-        /** Rising major third: parent reached. */
-        SUCCESS(doubleArrayOf(1046.50, 1318.51)),
-
+    enum class Cue(val notes: DoubleArray, val gap: Double = 0.09, val decay: Double = 0.07) {
         /** Single mellow note: recorded, needs attention later. Deliberately not an "error" sound. */
         SOFT(doubleArrayOf(880.0)),
 
         /** Major arpeggio: report ready. */
         COMPLETE(doubleArrayOf(1046.50, 1318.51, 1567.98)),
+
+        /** Quick bright "ta-da" arpeggio up to the octave: parent contacted. */
+        CELEBRATE(doubleArrayOf(1046.50, 1318.51, 1567.98, 2093.0), gap = 0.07, decay = 0.12),
+
+        /** "Ding-dong" doorbell (falling major third): parent will come to visit. */
+        DOORBELL(doubleArrayOf(1318.51, 1046.50), gap = 0.32, decay = 0.3),
+
+        /** Slow falling "wah-wah" steps: call not received. */
+        SAD(doubleArrayOf(783.99, 739.99, 698.46, 659.25), gap = 0.24, decay = 0.2),
     }
 
     private const val RATE = 44100
-    private const val NOTE_GAP = 0.09
     private const val TAIL = 0.3
     private val tracks = mutableMapOf<Cue, AudioTrack>()
 
@@ -49,7 +54,7 @@ object Sounds {
     }
 
     private fun build(cue: Cue): AudioTrack {
-        val pcm = synth(cue.notes)
+        val pcm = synth(cue)
         return AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -71,15 +76,16 @@ object Sounds {
     }
 
     /** Bell-like notes: 5 ms attack, exponential decay, a little second harmonic for warmth. */
-    private fun synth(notes: DoubleArray): ShortArray {
-        val total = ((NOTE_GAP * (notes.size - 1) + TAIL) * RATE).toInt()
+    private fun synth(cue: Cue): ShortArray {
+        val notes = cue.notes
+        val total = ((cue.gap * (notes.size - 1) + TAIL + cue.decay * 3) * RATE).toInt()
         return ShortArray(total) { n ->
             val t = n.toDouble() / RATE
             var v = 0.0
             notes.forEachIndexed { k, f ->
-                val local = t - k * NOTE_GAP
+                val local = t - k * cue.gap
                 if (local >= 0) {
-                    val env = min(1.0, local / 0.005) * exp(-local / 0.07)
+                    val env = min(1.0, local / 0.005) * exp(-local / cue.decay)
                     v += env * (sin(2 * PI * f * local) + 0.25 * sin(4 * PI * f * local))
                 }
             }

@@ -1,0 +1,157 @@
+package com.creativeclasses.callingapp
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
+
+enum class ReactionKind { CELEBRATE, SAD, VISIT }
+
+/** A one-off full-screen reaction; a new [id] restarts it. */
+data class Reaction(val kind: ReactionKind, val id: Long = System.nanoTime()) {
+    val happy get() = kind == ReactionKind.CELEBRATE
+}
+
+private class Bit(val x: Float, val y: Float, val vx: Float, val vy: Float, val spin: Float, val color: Color)
+
+private val CONFETTI = listOf(Color(0xFFF43F5E), Color(0xFFF59E0B), Color(0xFF22C55E), Color(0xFF3B82F6), Color(0xFFA855F7), Color(0xFFEC4899))
+
+/**
+ * Confetti + 🎉 for a reached parent, gentle rain + 😞 for an unanswered call. Draw-only: it never takes touches,
+ * so the teacher can keep working while it plays.
+ */
+@Composable
+fun ReactionOverlay(reaction: Reaction?, onDone: () -> Unit) {
+    if (reaction == null) return
+    if (reaction.kind == ReactionKind.VISIT) {
+        key(reaction.id) { VisitConfirmed(onDone) }
+        return
+    }
+    key(reaction.id) {
+        val progress = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            progress.animateTo(1f, tween(if (reaction.happy) 1800 else 2200, easing = LinearEasing))
+            onDone()
+        }
+        val bits = remember {
+            val r = Random(reaction.id)
+            List(if (reaction.happy) 90 else 45) {
+                if (reaction.happy) {
+                    Bit(0.5f, 0.45f, r.nextFloat() * 2 - 1, -(0.6f + r.nextFloat() * 0.9f), r.nextFloat() * 720 - 360, CONFETTI[r.nextInt(CONFETTI.size)])
+                } else {
+                    Bit(r.nextFloat(), -r.nextFloat() * 0.6f, 0f, 0.9f + r.nextFloat() * 0.6f, 0f, Color(0xFF60A5FA))
+                }
+            }
+        }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val p = progress.value
+                val fade = (1 - p * p * p).coerceIn(0f, 1f)
+                bits.forEach { b ->
+                    if (reaction.happy) {
+                        val t = p * 1.8f
+                        val pos = Offset(size.width * (b.x + b.vx * 0.45f * t), size.height * (b.y + b.vy * 0.55f * t + 0.6f * t * t))
+                        rotate(b.spin * t, pos) {
+                            drawRect(b.color.copy(alpha = fade), pos - Offset(8f, 5f), Size(16f, 10f))
+                        }
+                    } else {
+                        val y = size.height * (b.y + b.vy * p * 1.2f)
+                        val x = size.width * b.x
+                        drawLine(b.color.copy(alpha = 0.7f * fade), Offset(x, y), Offset(x, y + 36f), strokeWidth = 5f, cap = StrokeCap.Round)
+                    }
+                }
+            }
+            Text(
+                if (reaction.happy) "\uD83C\uDF89" else "\uD83D\uDE1E",
+                Modifier.graphicsLayer {
+                    val p = progress.value
+                    alpha = (if (p < 0.75f) 1f else (1 - p) * 4).coerceIn(0f, 1f)
+                    if (reaction.happy) {
+                        val pop = (p / 0.15f).coerceAtMost(1f)
+                        scaleX = 0.3f + pop * 0.9f + sin(p * 20) * 0.04f
+                        scaleY = scaleX
+                        rotationZ = sin(p * 14) * 12
+                    } else {
+                        scaleX = 0.6f + (p / 0.2f).coerceAtMost(1f) * 0.5f
+                        scaleY = scaleX
+                        translationY = p * 120f
+                        rotationZ = sin(p * 9) * 6
+                    }
+                },
+                fontSize = 96.sp,
+            )
+        }
+    }
+}
+
+/**
+ * "Visit booked" confirmation in the style of booking/calendar apps: a circle pops in, a checkmark draws itself,
+ * rings ripple outward and a school icon floats up.
+ */
+@Composable
+private fun VisitConfirmed(onDone: () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(1700, easing = LinearEasing))
+        onDone()
+    }
+    val sky = outcomeColor(com.creativeclasses.report.CallOutcome.WILL_VISIT)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val p = progress.value
+            val fade = (if (p < 0.75f) 1f else (1 - p) * 4).coerceIn(0f, 1f)
+            val r = 70.dp.toPx()
+            listOf(0f, 0.15f, 0.3f).forEach { start ->
+                val q = ((p - start) / 0.6f).coerceIn(0f, 1f)
+                if (q > 0f && q < 1f) drawCircle(sky.copy(alpha = (1 - q) * 0.5f), r * (1 + q * 1.6f), center, style = Stroke(4.dp.toPx()))
+            }
+            val pop = (p / 0.18f).coerceAtMost(1f)
+            val scale = pop * (1 + 0.15f * sin(pop * PI.toFloat()))
+            drawCircle(sky.copy(alpha = fade), r * scale, center)
+            val tick = Path().apply {
+                moveTo(center.x - r * 0.42f, center.y + r * 0.02f)
+                lineTo(center.x - r * 0.1f, center.y + r * 0.34f)
+                lineTo(center.x + r * 0.45f, center.y - r * 0.3f)
+            }
+            val drawn = Path()
+            val measure = PathMeasure().apply { setPath(tick, false) }
+            measure.getSegment(0f, measure.length * ((p - 0.18f) / 0.3f).coerceIn(0f, 1f), drawn, true)
+            drawPath(drawn, Color.White.copy(alpha = fade), style = Stroke(9.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+        Text(
+            "\uD83C\uDFEB",
+            Modifier.graphicsLayer {
+                val p = progress.value
+                val q = ((p - 0.3f) / 0.4f).coerceIn(0f, 1f)
+                alpha = (if (p < 0.8f) q else (1 - p) * 5).coerceIn(0f, 1f)
+                translationY = -110.dp.toPx() - q * 40.dp.toPx()
+                rotationZ = sin(p * 12) * 6
+            },
+            fontSize = 56.sp,
+        )
+    }
+}

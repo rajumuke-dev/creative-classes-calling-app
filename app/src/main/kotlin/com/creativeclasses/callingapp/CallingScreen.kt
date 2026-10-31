@@ -98,6 +98,7 @@ fun CallingScreen(vm: CallingViewModel) {
     var showMarks by remember { mutableStateOf(false) }
     var speakIndex by remember { mutableStateOf<Int?>(null) }
     val opened = remember { mutableStateMapOf<Int, Boolean>() }
+    var reaction by remember { mutableStateOf<Reaction?>(null) }
     val scope = rememberCoroutineScope()
     val startVoice = rememberVoiceInput { spoken ->
         speakIndex?.let { i -> vm.updateRecord(i) { it.copy(remark = appendSpoken(it.remark, spoken)) } }
@@ -219,8 +220,21 @@ fun CallingScreen(vm: CallingViewModel) {
                                     val chosen = if (record.outcome == outcome) CallOutcome.NOT_CALLED else outcome
                                     vm.updateRecord(i) { it.copy(outcome = chosen) }
                                     if (chosen != CallOutcome.NOT_CALLED) {
-                                        val reached = chosen == CallOutcome.CONTACTED || chosen == CallOutcome.WILL_VISIT
-                                        Sounds.play(context, if (reached) Sounds.Cue.SUCCESS else Sounds.Cue.SOFT)
+                                        Sounds.play(
+                                            context,
+                                            when (chosen) {
+                                                CallOutcome.CONTACTED -> Sounds.Cue.CELEBRATE
+                                                CallOutcome.NO_ANSWER -> Sounds.Cue.SAD
+                                                CallOutcome.WILL_VISIT -> Sounds.Cue.DOORBELL
+                                                else -> Sounds.Cue.SOFT
+                                            },
+                                        )
+                                        when (chosen) {
+                                            CallOutcome.CONTACTED -> reaction = Reaction(ReactionKind.CELEBRATE)
+                                            CallOutcome.NO_ANSWER -> reaction = Reaction(ReactionKind.SAD)
+                                            CallOutcome.WILL_VISIT -> reaction = Reaction(ReactionKind.VISIT)
+                                            else -> Unit
+                                        }
                                     }
                                     if (chosen in AUTO_COLLAPSE) {
                                         scope.launch {
@@ -280,6 +294,7 @@ fun CallingScreen(vm: CallingViewModel) {
             elevation = raisedButton(),
         ) { Text("Share Report") }
     }
+    ReactionOverlay(reaction) { reaction = null }
     if (showMarks) MarksDialog(vm) { showMarks = false }
     vm.filterNotice?.let { notice ->
         AlertDialog(

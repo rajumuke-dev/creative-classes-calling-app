@@ -19,8 +19,9 @@ dashboard lists every session with called / total, the outcome breakdown and the
 Student cards minimise once an outcome is recorded (Contacted, Will Come to Visit and Call Later after a
 short pause; Concern Raised and Call Not Received via **Done ✓**) and show a coloured outcome badge, follow-up
 flag and remark preview. Tap a card heading to reopen it.
-Short synthesised sounds mark key moments: a rising chime for Contacted / Will Come to Visit, one soft note for
-the other outcomes and a three-note chime when the report preview opens. They play as interface sounds and stay
+Short synthesised sounds and a brief full-screen animation mark outcomes: confetti and a "ta-da" for Contacted,
+a check-mark "visit booked" ripple and doorbell for Will Come to Visit, gentle rain and a falling tune for Call Not
+Received, one soft note for the others, and a three-note chime when the report preview opens. They play as interface sounds and stay
 silent when the phone is on silent/vibrate or system "Touch sounds" is off.
 
 **Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
