@@ -19,6 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
@@ -33,7 +35,10 @@ fun ReportScreen(vm: CallingViewModel) {
     }
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
-        Text("Report Preview", style = MaterialTheme.typography.titleLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { vm.screen = Screen.CALLING }) { Text("\u2190 Back") }
+            Text("Report Preview", Modifier.padding(start = 4.dp), style = MaterialTheme.typography.titleLarge)
+        }
         vm.reportScope?.let { Text("Covers only $it.", style = MaterialTheme.typography.bodySmall) }
         OutlinedTextField(
             value = vm.reportText,

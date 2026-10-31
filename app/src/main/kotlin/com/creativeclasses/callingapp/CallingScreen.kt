@@ -94,10 +94,11 @@ fun CallingScreen(vm: CallingViewModel) {
     val bar by animateFloatAsState(if (progress.total == 0) 0f else progress.attempted.toFloat() / progress.total, label = "progress")
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
-        Row(Modifier.padding(start = 4.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = vm::goToDashboard) { Text("Dashboard") }
+        Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = vm::goToDashboard) { Text("\u2190 Back") }
             AnimatedCount("Called ${progress.attempted} / ${progress.total}", Modifier.weight(1f))
             TextButton(onClick = { showMarks = true }) { Text("Marks") }
+            TextButton(onClick = vm::prepareReport) { Text("Next \u2192") }
         }
         LinearProgressIndicator(
             progress = { bar },

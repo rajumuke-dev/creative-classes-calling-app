@@ -59,6 +59,11 @@ fun SetupScreen(vm: CallingViewModel) {
     Column(
         Modifier.fillMaxWidth().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
+        Row {
+            TextButton(onClick = vm::goToDashboard) { Text("\u2190 Back") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = vm::startCalling) { Text("Next \u2192") }
+        }
         HeroHeader("Creative Classes", "Parent Calling")
         Spacer(Modifier.height(16.dp))
 
