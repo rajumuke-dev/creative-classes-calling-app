@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.foundation.border
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
@@ -26,7 +29,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -53,23 +56,17 @@ fun DashboardScreen(vm: CallingViewModel) {
     var pendingDelete by remember { mutableStateOf<SavedSession?>(null) }
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Logo()
-            Column(Modifier.padding(start = 12.dp)) {
-                Text("Creative Classes", style = MaterialTheme.typography.headlineSmall)
-                Text("Calling Sessions", style = MaterialTheme.typography.titleMedium)
-            }
-        }
+        HeroHeader("Creative Classes", "Calling Sessions")
         if (vm.sessions.isEmpty()) {
             Text("No calling sessions yet. Import an Excel file to start.", Modifier.weight(1f).padding(top = 16.dp))
         } else {
             LazyColumn(Modifier.weight(1f).padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(vm.sessions, key = { it.id }) { session ->
-                    SessionCard(session, Modifier.animateItem(), onOpen = { vm.openSession(session) }, onDelete = { pendingDelete = session })
+                itemsIndexed(vm.sessions, key = { _, s -> s.id }) { i, session ->
+                    SessionCard(session, Modifier.animateItem().enter3D(80 * i.coerceAtMost(6)).tiltOnTouch(), onOpen = { vm.openSession(session) }, onDelete = { pendingDelete = session })
                 }
             }
         }
-        Button(onClick = vm::newSession, Modifier.fillMaxWidth(), elevation = raisedButton()) { Text("New Calling Session") }
+        Button(onClick = vm::newSession, Modifier.fillMaxWidth().tiltOnTouch(8f), elevation = raisedButton()) { Text("New Calling Session") }
     }
 
     pendingDelete?.let { session ->
@@ -94,16 +91,19 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
     ElevatedCard(
         modifier.fillMaxWidth().animateContentSize(),
         shape = CardShape,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.fillMaxWidth().background(CardSheen).padding(14.dp)) {
             Text(session.title, style = MaterialTheme.typography.titleSmall)
             Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
-            Text("Called ${p.attempted} / ${p.total}", Modifier.padding(top = 8.dp), style = MaterialTheme.typography.titleMedium)
+            AnimatedCount("Called ${p.attempted} / ${p.total}", Modifier.padding(top = 8.dp))
             val progress by animateFloatAsState(if (p.total == 0) 0f else p.attempted.toFloat() / p.total, label = "progress")
             LinearProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(8.dp).clip(CircleShape),
+                trackColor = MaterialTheme.colorScheme.primaryContainer,
+                strokeCap = StrokeCap.Round,
             )
             Text("Contacted ${p.contacted} • Concern ${p.concerns} • Will visit ${p.willVisit} • Call not received ${p.noAnswer} • Call later ${p.callLater}")
             Text("Not called ${p.notCalled} • Follow-ups ${p.followUps}")
@@ -123,7 +123,7 @@ fun Logo(size: Int = 56) {
     val pop = remember { Animatable(0.6f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.4f)) }
     Box(
-        Modifier.size(size.dp).scale(pop.value).clip(CircleShape).background(Color(0xFF1A56A0)),
+        Modifier.size(size.dp).scale(pop.value).clip(CircleShape).background(Color(0xFF1A56A0)).border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Image(painterResource(R.drawable.ic_logo_foreground), contentDescription = "Creative Classes logo", modifier = Modifier.requiredSize((size * 1.6f).dp))

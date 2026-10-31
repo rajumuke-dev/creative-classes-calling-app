@@ -3,6 +3,19 @@ package com.creativeclasses.callingapp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedButton
@@ -81,14 +94,15 @@ fun CallingScreen(vm: CallingViewModel) {
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Row(Modifier.padding(start = 4.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = vm::goToDashboard) { Text("Dashboard") }
-            Text(
-                "Called ${progress.attempted} / ${progress.total}",
-                Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-            )
+            AnimatedCount("Called ${progress.attempted} / ${progress.total}", Modifier.weight(1f))
             TextButton(onClick = { showMarks = true }) { Text("Marks") }
         }
-        LinearProgressIndicator(progress = { bar }, Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+        LinearProgressIndicator(
+            progress = { bar },
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(8.dp).clip(CircleShape),
+            trackColor = MaterialTheme.colorScheme.primaryContainer,
+            strokeCap = StrokeCap.Round,
+        )
         FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CallFilter.values().forEach { f ->
                 FilterChip(selected = vm.filter == f, onClick = { vm.filter = f }, label = { Text(f.label) })
@@ -142,12 +156,17 @@ fun CallingScreen(vm: CallingViewModel) {
         ) {
             items(shown, key = { it }) { i ->
                 val record = vm.records[i]
+                val accent by animateColorAsState(
+                    if (record.outcome == CallOutcome.NOT_CALLED) MaterialTheme.colorScheme.primaryContainer else outcomeColor(record.outcome),
+                    label = "accent",
+                )
                 ElevatedCard(
-                    Modifier.fillMaxWidth().animateItem().animateContentSize(),
+                    Modifier.fillMaxWidth().animateItem().enter3D().tiltOnTouch(2f).animateContentSize(),
                     shape = CardShape,
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 ) {
-                    Column(Modifier.padding(12.dp)) {
+                    Column(Modifier.fillMaxWidth().background(CardSheen).drawBehind { drawRect(accent, size = Size(6.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(record.studentName, style = MaterialTheme.typography.titleSmall)
@@ -169,15 +188,11 @@ fun CallingScreen(vm: CallingViewModel) {
                         }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OUTCOME_CHOICES.forEach { (outcome, label) ->
-                                FilterChip(
-                                    selected = record.outcome == outcome,
-                                    onClick = {
-                                        vm.updateRecord(i) {
-                                            it.copy(outcome = if (it.outcome == outcome) CallOutcome.NOT_CALLED else outcome)
-                                        }
-                                    },
-                                    label = { Text(label) },
-                                )
+                                OutcomeChip(outcome, label, record.outcome == outcome) {
+                                    vm.updateRecord(i) {
+                                        it.copy(outcome = if (it.outcome == outcome) CallOutcome.NOT_CALLED else outcome)
+                                    }
+                                }
                             }
                         }
                         AnimatedVisibility(record.outcome == CallOutcome.NO_ANSWER) {
@@ -219,7 +234,7 @@ fun CallingScreen(vm: CallingViewModel) {
         }
         Button(
             onClick = vm::prepareReport,
-            Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding().tiltOnTouch(8f),
             elevation = raisedButton(),
         ) { Text("Share Report") }
     }
@@ -231,6 +246,26 @@ fun CallingScreen(vm: CallingViewModel) {
             confirmButton = { TextButton(onClick = { vm.filterNotice = null }) { Text("OK") } },
         )
     }
+}
+
+/** Outcome chip that fills with its outcome colour and gives a springy bounce when chosen. */
+@Composable
+private fun OutcomeChip(outcome: CallOutcome, label: String, selected: Boolean, onClick: () -> Unit) {
+    val color by animateColorAsState(if (selected) outcomeColor(outcome) else Color.Transparent, label = "chipColor")
+    val bounce = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        if (selected) {
+            bounce.snapTo(0.85f)
+            bounce.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 500f))
+        }
+    }
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        modifier = Modifier.scale(bounce.value),
+        colors = FilterChipDefaults.filterChipColors(selectedContainerColor = color, selectedLabelColor = Color.White),
+    )
 }
 
 @Composable

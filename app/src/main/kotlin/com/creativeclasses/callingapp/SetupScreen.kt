@@ -59,11 +59,10 @@ fun SetupScreen(vm: CallingViewModel) {
     Column(
         Modifier.fillMaxWidth().statusBarsPadding().verticalScroll(rememberScrollState()).padding(16.dp),
     ) {
-        Text("Creative Classes", style = MaterialTheme.typography.headlineSmall)
-        Text("Parent Calling", style = MaterialTheme.typography.titleMedium)
+        HeroHeader("Creative Classes", "Parent Calling")
         Spacer(Modifier.height(16.dp))
 
-        Button(onClick = { picker.launch(arrayOf(XLSX_MIME)) }, Modifier.fillMaxWidth(), elevation = raisedButton()) {
+        Button(onClick = { picker.launch(arrayOf(XLSX_MIME)) }, Modifier.fillMaxWidth().tiltOnTouch(8f), elevation = raisedButton()) {
             Text("Import Excel (.xlsx)")
         }
         vm.message?.let { Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
@@ -134,7 +133,7 @@ fun SetupScreen(vm: CallingViewModel) {
         )
 
         Spacer(Modifier.height(16.dp))
-        Button(onClick = vm::startCalling, Modifier.fillMaxWidth(), elevation = raisedButton()) {
+        Button(onClick = vm::startCalling, Modifier.fillMaxWidth().tiltOnTouch(8f), elevation = raisedButton()) {
             Text(if (vm.students.isEmpty()) "Start Calling" else "Start Calling (${vm.students.size} students)")
         }
     }

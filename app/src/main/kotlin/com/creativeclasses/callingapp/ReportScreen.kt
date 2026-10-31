@@ -19,6 +19,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
@@ -37,7 +39,9 @@ fun ReportScreen(vm: CallingViewModel) {
             value = vm.reportText,
             onValueChange = { vm.reportText = it },
             readOnly = !editing,
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp),
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp).enter3D()
+                .shadow(10.dp, CardShape).background(CardSheen, CardShape),
+            shape = CardShape,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = { editing = !editing }, Modifier.weight(1f)) {
@@ -48,7 +52,7 @@ fun ReportScreen(vm: CallingViewModel) {
                 startVoice()
             }, Modifier.weight(1f)) { Text("\uD83C\uDF99 Speak") }
         }
-        Button(onClick = { shareReport(context, vm.reportText) }, Modifier.fillMaxWidth().padding(top = 8.dp), elevation = raisedButton()) {
+        Button(onClick = { shareReport(context, vm.reportText) }, Modifier.fillMaxWidth().padding(top = 8.dp).tiltOnTouch(8f), elevation = raisedButton()) {
             Text("Share on WhatsApp")
         }
     }

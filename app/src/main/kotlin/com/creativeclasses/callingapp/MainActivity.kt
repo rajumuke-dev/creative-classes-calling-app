@@ -8,14 +8,15 @@ import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
@@ -24,9 +25,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            AppTheme {
                 Surface(
-                    Modifier.background(Brush.verticalGradient(listOf(Color(0xFFE9E3FA), Color(0xFFF8F6FF), Color(0xFFDDE8FA)))),
+                    Modifier.fillMaxSize().background(BackgroundBrush),
                     color = Color.Transparent,
                 ) {
                     BackHandler(enabled = vm.screen != Screen.DASHBOARD) {
@@ -36,8 +37,8 @@ class MainActivity : ComponentActivity() {
                         targetState = vm.screen,
                         transitionSpec = {
                             val forward = targetState.ordinal > initialState.ordinal
-                            (fadeIn() + slideInHorizontally { if (forward) it / 4 else -it / 4 }) togetherWith
-                                (fadeOut() + slideOutHorizontally { if (forward) -it / 4 else it / 4 })
+                            (fadeIn() + scaleIn(initialScale = 0.92f) + slideInHorizontally { if (forward) it / 3 else -it / 3 }) togetherWith
+                                (fadeOut() + scaleOut(targetScale = 0.92f) + slideOutHorizontally { if (forward) -it / 3 else it / 3 })
                         },
                         label = "screen",
                     ) { screen ->
