@@ -51,6 +51,7 @@ import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.Concern
 import com.creativeclasses.report.MarksRule
+import com.creativeclasses.report.ParentMessage
 import com.creativeclasses.report.PhoneNumbers
 import com.creativeclasses.report.SessionProgress
 
@@ -185,6 +186,13 @@ fun CallingScreen(vm: CallingViewModel) {
                                 speakIndex = i
                                 startVoice()
                             }) { Text("\uD83C\uDF99 Speak") }
+                            val student = vm.students[i]
+                            val reachable = listOfNotNull(student.contact1, student.contact2).firstOrNull { PhoneNumbers.isValid(it) }
+                            if (record.outcome == CallOutcome.NO_ANSWER && reachable != null) {
+                                TextButton(onClick = {
+                                    messageParent(context, reachable, ParentMessage.notReached(record.studentName))
+                                }) { Text("WhatsApp parent") }
+                            }
                             Checkbox(
                                 checked = record.followUpRequired,
                                 onCheckedChange = { v -> vm.updateRecord(i) { it.copy(followUpRequired = v) } },

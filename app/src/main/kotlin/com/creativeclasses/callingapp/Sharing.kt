@@ -21,6 +21,22 @@ fun shareReport(context: Context, text: String) {
     }
 }
 
+/** Opens a WhatsApp chat with the message pre-filled; nothing is sent until the teacher presses Send. */
+fun messageParent(context: Context, phone: String, text: String) {
+    val digits = PhoneNumbers.dialable(phone) ?: return
+    val number = if (digits.length == 10) "91$digits" else digits
+    val view = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number?text=${Uri.encode(text)}"))
+    try {
+        context.startActivity(Intent(view).setPackage(WHATSAPP_PACKAGE))
+    } catch (e: ActivityNotFoundException) {
+        try {
+            context.startActivity(view)
+        } catch (e: ActivityNotFoundException) {
+            // No WhatsApp or browser available on this device.
+        }
+    }
+}
+
 fun dialPhone(context: Context, phone: String) {
     val number = PhoneNumbers.dialable(phone) ?: return
     try {
