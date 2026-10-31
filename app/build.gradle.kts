@@ -20,6 +20,26 @@ android {
         compose = true
     }
 
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Sideloaded build: reuse the local debug key so it installs over the existing app and keeps its data.
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    // The bundled OCR engine is ~11 MB per CPU type; build one APK per phone CPU (plus a universal fallback).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
