@@ -61,8 +61,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     var students by mutableStateOf<List<ImportedStudent>>(emptyList())
     var records by mutableStateOf<List<CallRecord>>(emptyList())
     var marks by mutableStateOf<List<String>>(emptyList())
-    var maxMarks by mutableStateOf("")
-    var cutoff by mutableStateOf(DEFAULT_CUTOFF)
+    var lowBelow by mutableStateOf("")
     var marksNotice by mutableStateOf<String?>(null)
     var form by mutableStateOf(SessionForm())
     var message by mutableStateOf<String?>(null)
@@ -74,13 +73,12 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         refreshSessions()
     }
 
-    private val maxMarksValue get() = maxMarks.trim().toDoubleOrNull()?.takeIf { it > 0 && it.isFinite() }
-    private val cutoffValue get() = cutoff.trim().toDoubleOrNull()?.takeIf { it in 0.0..100.0 } ?: DEFAULT_CUTOFF.toDouble()
+    private val lowBelowValue get() = lowBelow.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
 
-    fun isLow(index: Int) = Marks.isLow(marks.getOrNull(index), maxMarksValue, cutoffValue)
+    fun isLow(index: Int) = Marks.isLow(marks.getOrNull(index), lowBelowValue)
 
     val hasMarks get() = marks.any { it.isNotBlank() }
-    val marksReady get() = maxMarksValue != null
+    val marksReady get() = lowBelowValue != null
 
     /** Low marks are listed lowest score first so the weakest students are called first. */
     val visibleIndices: List<Int>
@@ -101,13 +99,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         scheduleSave()
     }
 
-    fun updateMaxMarks(text: String) {
-        maxMarks = text.filter { it.isDigit() || it == '.' }.take(6)
-        scheduleSave()
-    }
-
-    fun updateCutoff(text: String) {
-        cutoff = text.filter { it.isDigit() || it == '.' }.take(5)
+    fun updateLowBelow(text: String) {
+        lowBelow = text.filter { it.isDigit() || it == '.' }.take(6)
         scheduleSave()
     }
 
@@ -150,8 +143,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         students = emptyList()
         records = emptyList()
         marks = emptyList()
-        maxMarks = ""
-        cutoff = DEFAULT_CUTOFF
+        lowBelow = ""
         form = SessionForm()
         date = LocalDate.now()
         message = null
@@ -165,8 +157,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         students = session.students
         records = session.records
         marks = session.marks
-        maxMarks = session.maxMarks
-        cutoff = session.cutoff
+        lowBelow = session.lowBelow
         filter = CallFilter.ALL
         resumeIndex = SessionProgress.of(session.records).resumeIndex ?: 0
         screen = Screen.CALLING
@@ -195,7 +186,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun write() {
         val id = currentId ?: return
-        store.save(SavedSession(id, form, date, students, records, marks, maxMarks, cutoff))
+        store.save(SavedSession(id, form, date, students, records, marks, lowBelow))
     }
 
     private fun scheduleSave() {

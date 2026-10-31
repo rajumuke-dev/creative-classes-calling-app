@@ -18,12 +18,12 @@ class MarksTest {
     }
 
     @Test
-    fun `low means scored below the cutoff percentage`() {
-        assertTrue(Marks.isLow("19", 50.0, 40.0))
-        assertFalse(Marks.isLow("20", 50.0, 40.0))
-        assertFalse(Marks.isLow("AB", 50.0, 40.0))
-        assertFalse(Marks.isLow("-", 50.0, 40.0))
-        assertFalse(Marks.isLow("5", null, 40.0))
+    fun `low means scored below the marks threshold`() {
+        assertTrue(Marks.isLow("19", 20.0))
+        assertFalse(Marks.isLow("20", 20.0))
+        assertFalse(Marks.isLow("AB", 20.0))
+        assertFalse(Marks.isLow("-", 20.0))
+        assertFalse(Marks.isLow("5", null))
     }
 
     @Test

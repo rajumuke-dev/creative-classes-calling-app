@@ -19,10 +19,9 @@ object Marks {
     }
 
     /** Absent and blank students have no score to rank, so they are never "low". */
-    fun isLow(text: String?, maxMarks: Double?, cutoffPercent: Double): Boolean {
-        val mark = parse(text)
-        val score = mark.score ?: return false
-        return maxMarks != null && maxMarks > 0 && score / maxMarks * 100 < cutoffPercent
+    fun isLow(text: String?, below: Double?): Boolean {
+        val score = parse(text).score ?: return false
+        return below != null && score < below
     }
 
     fun isAbsent(text: String?) = parse(text).kind == MarkKind.ABSENT

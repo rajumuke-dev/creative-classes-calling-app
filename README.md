@@ -17,7 +17,7 @@ dashboard lists every session with called / total, the outcome breakdown and the
 "Continue calling" opens the list at the first student not yet called. The calling list can be filtered
 (All / Not called / Follow-up). No Answer and Call Later count as called (attempted).
 
-**Marks** (one subject per session): set "Out of" and a low-marks cut-off (default 40%), then type marks on
+**Marks** (one subject per session): set the low-marks threshold (students scoring below that many marks are low), then type marks on
 each card or use "Read marks from image" (on-device OCR, nothing is uploaded). Names are matched exactly, then
 by same words in any order, then by a unique close spelling. The "Low marks" filter lists scorers below the
 cut-off, lowest first; "Absent" lists AB. OCR can misread digits, so review the marks; the import notice lists

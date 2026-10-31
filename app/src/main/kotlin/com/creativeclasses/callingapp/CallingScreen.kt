@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
@@ -81,9 +83,19 @@ fun CallingScreen(vm: CallingViewModel) {
                 FilterChip(selected = vm.filter == f, onClick = { vm.filter = f }, label = { Text(f.label) })
             }
         }
+        if (vm.filter == CallFilter.LOW_MARKS) {
+            OutlinedTextField(
+                value = vm.lowBelow,
+                onValueChange = vm::updateLowBelow,
+                label = { Text("Show students scoring below (marks)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         if (shown.isEmpty()) {
             val hint = if (vm.filter == CallFilter.LOW_MARKS && !vm.marksReady) {
-                "Open Marks and enter the total marks (Out of) to find low scorers."
+                "Enter the marks above to list students scoring below it."
             } else {
                 "No students in this view."
             }
@@ -201,18 +213,11 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
         text = {
             Column {
                 OutlinedTextField(
-                    value = vm.maxMarks,
-                    onValueChange = vm::updateMaxMarks,
-                    label = { Text("Out of (total marks)") },
+                    value = vm.lowBelow,
+                    onValueChange = vm::updateLowBelow,
+                    label = { Text("Low marks: below (marks)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = vm.cutoff,
-                    onValueChange = vm::updateCutoff,
-                    label = { Text("Low marks: below % of total") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
                 OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth().padding(top = 12.dp)) {
                     Text("Read marks from image")
