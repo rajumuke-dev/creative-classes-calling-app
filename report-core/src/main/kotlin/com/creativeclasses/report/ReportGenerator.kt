@@ -10,6 +10,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         val total = records.size
         val contacted = records.count { it.isContacted() }
         val noAnswer = records.count { it.outcome == CallOutcome.NO_ANSWER }
+        val willVisit = records.count { it.outcome == CallOutcome.WILL_VISIT }
         val callLater = records.count { it.outcome == CallOutcome.CALL_LATER }
         val noContact = records.count { it.noContact() }
         val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED } - noContact
@@ -36,6 +37,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         out.appendLine("Total Parents: $total")
         out.appendLine("Parents Contacted: $contacted")
         if (noAnswer > 0) out.appendLine("Call Not Received: $noAnswer")
+        if (willVisit > 0) out.appendLine("Will Come to Visit: $willVisit")
         if (callLater > 0) out.appendLine("Call Later: $callLater")
         if (notCalled > 0) out.appendLine("Not Yet Called: $notCalled")
         if (noContact > 0) out.appendLine("Contact Not Found: $noContact")
@@ -119,6 +121,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
             r.noContact() -> listOf("Contact number not found, so the parent could not be called.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.NOT_CALLED -> listOf("Call has not been made yet.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.NO_ANSWER -> listOf("Parent could not be reached.") + sentenceOrEmpty(remark)
+            r.outcome == CallOutcome.WILL_VISIT -> listOf("Parent will come to visit the school.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.CALL_LATER -> listOf("Parent is to be called again later.") + sentenceOrEmpty(remark)
             r.hasConcern() -> concernSentences(r, remark)
             remark != null -> listOf(sentence(remark))
@@ -170,7 +173,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
     private fun classLabel(session: CallingSession) =
         listOfNotNull(session.className.clean(), session.board.clean()).joinToString(" ")
 
-    private fun CallRecord.isContacted() = outcome == CallOutcome.CONTACTED || outcome == CallOutcome.CONCERN_RAISED
+    private fun CallRecord.isContacted() = outcome == CallOutcome.CONTACTED || outcome == CallOutcome.CONCERN_RAISED || outcome == CallOutcome.WILL_VISIT
     private fun CallRecord.hasConcern() = isContacted() && (outcome == CallOutcome.CONCERN_RAISED || concerns.isNotEmpty())
     private fun CallRecord.isQuiet() =
         outcome == CallOutcome.CONTACTED && !hasConcern() && !needsFollowUp() && cleanRemark(remark) == null

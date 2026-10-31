@@ -87,6 +87,15 @@ class ReportGeneratorTest {
     }
 
     @Test
+    fun `parent who will visit is contacted, listed and does not block completion`() {
+        val text = generator.generate(session, ok(2) + CallRecord("Asha Rao", CallOutcome.WILL_VISIT)).text
+        assertContains(text, "Parents Contacted: 3")
+        assertContains(text, "Will Come to Visit: 1")
+        assertContains(text, "Asha Rao\nParent will come to visit the school.")
+        assertContains(text, "Completed Successfully")
+    }
+
+    @Test
     fun `no answer call lists follow-up call`() {
         val report = generator.generate(session, ok(1) + CallRecord("Amit Joshi", CallOutcome.NO_ANSWER))
         assertContains(report.text, "1. Amit Joshi\nParent could not be reached. Follow-up call required.")

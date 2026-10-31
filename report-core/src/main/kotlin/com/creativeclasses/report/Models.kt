@@ -12,7 +12,7 @@ enum class CallingPurpose(val label: String) {
     OTHER("Other"),
 }
 
-enum class CallOutcome { CONTACTED, CONCERN_RAISED, NO_ANSWER, CALL_LATER, NOT_CALLED }
+enum class CallOutcome { CONTACTED, CONCERN_RAISED, WILL_VISIT, NO_ANSWER, CALL_LATER, NOT_CALLED }
 
 /** [phrase] is used after "regarding" in report sentences. */
 enum class Concern(val phrase: String) {

@@ -57,6 +57,7 @@ import com.creativeclasses.report.SessionProgress
 private val OUTCOME_CHOICES = listOf(
     CallOutcome.CONTACTED to "Contacted",
     CallOutcome.CONCERN_RAISED to "Concern Raised",
+    CallOutcome.WILL_VISIT to "Will Come to Visit",
     CallOutcome.NO_ANSWER to "Call Not Received",
     CallOutcome.CALL_LATER to "Call Later",
 )

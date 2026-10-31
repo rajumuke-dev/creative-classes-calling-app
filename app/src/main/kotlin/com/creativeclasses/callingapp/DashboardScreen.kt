@@ -105,7 +105,7 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
             )
-            Text("Contacted ${p.contacted} • Concern ${p.concerns} • Call not received ${p.noAnswer} • Call later ${p.callLater}")
+            Text("Contacted ${p.contacted} • Concern ${p.concerns} • Will visit ${p.willVisit} • Call not received ${p.noAnswer} • Call later ${p.callLater}")
             Text("Not called ${p.notCalled} • Follow-ups ${p.followUps}")
             p.resumeIndex?.let {
                 Text("Next: ${session.records[it].studentName}", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodyMedium)
