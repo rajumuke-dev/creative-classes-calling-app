@@ -1,6 +1,6 @@
 package com.creativeclasses.report
 
-/** Text pre-filled for the teacher when a parent did not pick up. The teacher reviews it and presses Send in WhatsApp. */
+/** Text pre-filled for the teacher when a parent did not pick up. The teacher reviews it and presses Send in the SMS app. */
 object ParentMessage {
     fun notReached(studentName: String, organisation: String = "Creative Classes"): String {
         val name = studentName.trim().replace(Regex("\\s+"), " ")

@@ -185,12 +185,12 @@ fun CallingScreen(vm: CallingViewModel) {
                                 .firstOrNull { PhoneNumbers.isValid(it) }
                             if (reachable != null) {
                                 Button(
-                                    onClick = { messageParent(context, reachable, ParentMessage.notReached(record.studentName)) },
+                                    onClick = { textParent(context, reachable, ParentMessage.notReached(record.studentName)) },
                                     Modifier.fillMaxWidth().padding(top = 8.dp),
                                     elevation = raisedButton(),
-                                ) { Text("Send WhatsApp message to parent") }
+                                ) { Text("Send text message to parent") }
                             } else {
-                                Text("No valid phone number, so no WhatsApp message can be sent.", Modifier.padding(top = 8.dp))
+                                Text("No valid phone number, so no text message can be sent.", Modifier.padding(top = 8.dp))
                             }
                         }
                         AnimatedVisibility(record.outcome == CallOutcome.CONCERN_RAISED) {
