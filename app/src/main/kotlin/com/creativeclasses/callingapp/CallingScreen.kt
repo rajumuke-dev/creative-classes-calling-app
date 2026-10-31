@@ -121,7 +121,7 @@ fun CallingScreen(vm: CallingViewModel) {
         }
     }
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().cameraShake(reaction)) {
         Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = vm::goToDashboard) { Text("\u2190 Back") }
             AnimatedCount("Called ${progress.attempted} / ${progress.total}", Modifier.weight(1f))

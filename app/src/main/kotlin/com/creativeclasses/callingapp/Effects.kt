@@ -17,8 +17,10 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -40,6 +42,29 @@ enum class ReactionKind { CELEBRATE, SAD, VISIT, DANCE }
 /** A one-off full-screen reaction; a new [id] restarts it. */
 data class Reaction(val kind: ReactionKind, val id: Long = System.nanoTime()) {
     val happy get() = kind == ReactionKind.CELEBRATE
+}
+
+/**
+ * Cinema "camera shake": the screen jolts on the impact of a big moment (contacted, visit, all done) and settles
+ * within half a second. Follows the system animation scale, so it is skipped when animations are off.
+ */
+fun Modifier.cameraShake(reaction: Reaction?): Modifier = composed {
+    val shake = remember { Animatable(1f) }
+    LaunchedEffect(reaction?.id) {
+        if (reaction != null && reaction.kind != ReactionKind.SAD) {
+            shake.snapTo(0f)
+            shake.animateTo(1f, tween(450, easing = LinearEasing))
+        }
+    }
+    graphicsLayer {
+        val p = shake.value
+        if (p < 1f) {
+            val fall = (1 - p) * (1 - p)
+            translationX = sin(p * 46) * fall * 9.dp.toPx()
+            translationY = sin(p * 37 + 1) * fall * 5.dp.toPx()
+            rotationZ = sin(p * 29) * fall * 0.8f
+        }
+    }
 }
 
 private class Bit(val x: Float, val y: Float, val vx: Float, val vy: Float, val spin: Float, val color: Color)
@@ -81,6 +106,13 @@ fun ReactionOverlay(reaction: Reaction?, onDone: () -> Unit) {
             Canvas(Modifier.fillMaxSize()) {
                 val p = progress.value
                 val fade = (1 - p * p * p).coerceIn(0f, 1f)
+                if (reaction.happy) {
+                    val flash = (1 - p / 0.18f).coerceIn(0f, 1f)
+                    if (flash > 0f) drawRect(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.85f * flash), Color(0x00FFF7D6)), center, size.maxDimension * 0.7f))
+                } else {
+                    val dim = (p / 0.15f).coerceAtMost(1f) * fade
+                    drawRect(Brush.radialGradient(listOf(Color.Transparent, Color(0xFF0F172A).copy(alpha = 0.45f * dim)), center, size.maxDimension * 0.75f))
+                }
                 bits.forEach { b ->
                     if (reaction.happy) {
                         val t = p * 1.8f
