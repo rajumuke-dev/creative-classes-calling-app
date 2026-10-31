@@ -132,6 +132,7 @@ fun SetupScreen(vm: CallingViewModel) {
         Field("Board (e.g. CBSE)", form.board) { vm.form = form.copy(board = it) }
         Field("Exam", form.exam) { vm.form = form.copy(exam = it) }
         Field("Teacher", form.teacher) { vm.form = form.copy(teacher = it) }
+        Field("Teacher available (e.g. Mon to Sat, 4 PM to 7 PM)", form.availability) { vm.form = form.copy(availability = it) }
         Text(
             "Date: " + vm.date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)),
             Modifier.padding(top = 8.dp),

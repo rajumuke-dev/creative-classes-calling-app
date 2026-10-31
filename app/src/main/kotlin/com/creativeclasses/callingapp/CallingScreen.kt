@@ -270,7 +270,7 @@ fun CallingScreen(vm: CallingViewModel) {
                                 .firstOrNull { PhoneNumbers.isValid(it) }
                             if (reachable != null) {
                                 Button(
-                                    onClick = { textParent(context, reachable, ParentMessage.notReached(record.studentName)) },
+                                    onClick = { textParent(context, reachable, ParentMessage.notReached(record.studentName, vm.form.teacher, vm.form.availability)) },
                                     Modifier.fillMaxWidth().padding(top = 8.dp),
                                     elevation = raisedButton(),
                                 ) { Text("Send text message to parent") }

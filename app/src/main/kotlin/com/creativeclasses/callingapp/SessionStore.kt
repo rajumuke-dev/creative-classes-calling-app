@@ -72,6 +72,7 @@ class SessionStore(context: Context) {
             put("purpose", s.form.purpose.name)
             put("customPurpose", s.form.customPurpose)
             put("teacher", s.form.teacher)
+            put("availability", s.form.availability)
         })
         put("students", JSONArray(s.students.map { st ->
             JSONObject().apply {
@@ -111,6 +112,7 @@ class SessionStore(context: Context) {
                 purpose = CallingPurpose.valueOf(f.getString("purpose")),
                 customPurpose = f.getString("customPurpose"),
                 teacher = f.getString("teacher"),
+                availability = f.optString("availability"),
             ),
             students = o.getJSONArray("students").objects().map {
                 ImportedStudent(it.getString("name"), it.str("contact1"), it.str("contact2"), it.str("group"), it.str("school"))

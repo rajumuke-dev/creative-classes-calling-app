@@ -47,6 +47,8 @@ data class SessionForm(
     val purpose: CallingPurpose = CallingPurpose.EXAM_RESULT,
     val customPurpose: String = "",
     val teacher: String = "",
+    /** When the teacher can take a call back, quoted in the text message to parents who were not reached. */
+    val availability: String = "",
 )
 
 /** Calling sessions are saved to private storage after every change, so work resumes after the app is closed. */
@@ -169,7 +171,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         threshold = ""
         marksRule = MarksRule.BELOW
         savedReport = null
-        form = SessionForm()
+        // Teacher details rarely change, so they carry over from the most recent session.
+        form = sessions.firstOrNull()?.form.let { SessionForm(teacher = it?.teacher.orEmpty(), availability = it?.availability.orEmpty()) }
         date = LocalDate.now()
         message = null
         screen = Screen.SETUP
