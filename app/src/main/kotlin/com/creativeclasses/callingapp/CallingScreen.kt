@@ -218,6 +218,10 @@ fun CallingScreen(vm: CallingViewModel) {
                                 OutcomeChip(outcome, label, record.outcome == outcome) {
                                     val chosen = if (record.outcome == outcome) CallOutcome.NOT_CALLED else outcome
                                     vm.updateRecord(i) { it.copy(outcome = chosen) }
+                                    if (chosen != CallOutcome.NOT_CALLED) {
+                                        val reached = chosen == CallOutcome.CONTACTED || chosen == CallOutcome.WILL_VISIT
+                                        Sounds.play(context, if (reached) Sounds.Cue.SUCCESS else Sounds.Cue.SOFT)
+                                    }
                                     if (chosen in AUTO_COLLAPSE) {
                                         scope.launch {
                                             delay(700)

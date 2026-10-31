@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.TextButton
 import androidx.compose.foundation.background
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.dp
 fun ReportScreen(vm: CallingViewModel) {
     val context = LocalContext.current
     var editing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { Sounds.play(context, Sounds.Cue.COMPLETE) }
     val startVoice = rememberVoiceInput { spoken ->
         vm.reportText = vm.reportText.trimEnd() + "\n" + spoken
     }
