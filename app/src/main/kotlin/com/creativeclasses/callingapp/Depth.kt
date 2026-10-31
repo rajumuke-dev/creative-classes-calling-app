@@ -33,6 +33,7 @@ fun raisedButton() = ButtonDefaults.buttonElevation(defaultElevation = 6.dp, pre
 /**
  * Presses the element in and tilts it toward the finger, like a physical tile. Touches are only observed, never
  * consumed, so buttons and text fields inside keep working; the tilt is released as soon as the finger scrolls.
+ * It also leans gently with the phone itself, so surfaces feel like live objects.
  */
 fun Modifier.tiltOnTouch(maxTilt: Float = 5f): Modifier = composed {
     var pressed by remember { mutableStateOf(false) }
@@ -42,6 +43,7 @@ fun Modifier.tiltOnTouch(maxTilt: Float = 5f): Modifier = composed {
     val scale by animateFloatAsState(if (pressed) 0.97f else 1f, bouncy, label = "pressScale")
     val rx by animateFloatAsState(if (pressed) tiltX else 0f, bouncy, label = "tiltX")
     val ry by animateFloatAsState(if (pressed) tiltY else 0f, bouncy, label = "tiltY")
+    val device = LocalDeviceTilt.current
     pointerInput(maxTilt) {
         val slop = viewConfiguration.touchSlop
         awaitEachGesture {
@@ -62,8 +64,9 @@ fun Modifier.tiltOnTouch(maxTilt: Float = 5f): Modifier = composed {
     }.graphicsLayer {
         scaleX = scale
         scaleY = scale
-        rotationX = rx
-        rotationY = ry
+        val lean = device.value
+        rotationX = rx + lean.y * 6f
+        rotationY = ry + lean.x * 6f
         cameraDistance = 14 * density
     }
 }

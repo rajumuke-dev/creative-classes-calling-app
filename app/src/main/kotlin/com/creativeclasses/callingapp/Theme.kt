@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -104,16 +105,20 @@ fun HeroHeader(title: String, subtitle: String, modifier: Modifier = Modifier) {
     )
     val shape = RoundedCornerShape(24.dp)
     Row(
-        modifier.fillMaxWidth().enter3D().shadow(14.dp, shape, ambientColor = Violet, spotColor = Violet).clip(shape)
+        modifier.fillMaxWidth().enter3D().tiltOnTouch(4f).shadow(14.dp, shape, ambientColor = Violet, spotColor = Violet).clip(shape)
             .drawBehind {
                 val w = size.width
                 drawRect(Brush.linearGradient(listOf(Indigo, Violet, Pink), Offset(-w + 2 * w * shift, 0f), Offset(w * shift + w, size.height)))
                 drawRect(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.28f), Color.Transparent), endY = size.height * 0.55f))
             }
+            .liveGlare()
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Logo()
+        Logo(Modifier.graphicsLayer {
+            translationY = (shift - 0.5f) * 6.dp.toPx()
+            rotationY = (shift - 0.5f) * 24f
+        })
         Column(Modifier.padding(start = 14.dp)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Text(subtitle, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))

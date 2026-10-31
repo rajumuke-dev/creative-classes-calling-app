@@ -15,6 +15,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
@@ -166,7 +168,7 @@ fun CallingScreen(vm: CallingViewModel) {
                     elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp),
                     colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 ) {
-                    Column(Modifier.fillMaxWidth().background(CardSheen).drawBehind { drawRect(accent, size = Size(6.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
+                    Column(Modifier.fillMaxWidth().background(CardSheen).liveGlare().drawBehind { drawRect(accent, size = Size(6.dp.toPx(), size.height)) }.padding(start = 16.dp, top = 12.dp, end = 12.dp, bottom = 12.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(record.studentName, style = MaterialTheme.typography.titleSmall)
@@ -253,6 +255,7 @@ fun CallingScreen(vm: CallingViewModel) {
 private fun OutcomeChip(outcome: CallOutcome, label: String, selected: Boolean, onClick: () -> Unit) {
     val color by animateColorAsState(if (selected) outcomeColor(outcome) else Color.Transparent, label = "chipColor")
     val bounce = remember { Animatable(1f) }
+    val haptics = LocalHapticFeedback.current
     LaunchedEffect(selected) {
         if (selected) {
             bounce.snapTo(0.85f)
@@ -261,7 +264,10 @@ private fun OutcomeChip(outcome: CallOutcome, label: String, selected: Boolean, 
     }
     FilterChip(
         selected = selected,
-        onClick = onClick,
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         label = { Text(label) },
         modifier = Modifier.scale(bounce.value),
         colors = FilterChipDefaults.filterChipColors(selectedContainerColor = color, selectedLabelColor = Color.White),

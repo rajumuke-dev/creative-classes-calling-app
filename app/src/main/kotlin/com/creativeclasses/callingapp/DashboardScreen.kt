@@ -94,7 +94,7 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
     ) {
-        Column(Modifier.fillMaxWidth().background(CardSheen).padding(14.dp)) {
+        Column(Modifier.fillMaxWidth().background(CardSheen).liveGlare().padding(14.dp)) {
             Text(session.title, style = MaterialTheme.typography.titleSmall)
             Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
             AnimatedCount("Called ${p.attempted} / ${p.total}", Modifier.padding(top = 8.dp))
@@ -119,11 +119,11 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
 }
 
 @Composable
-fun Logo(size: Int = 56) {
+fun Logo(modifier: Modifier = Modifier, size: Int = 56) {
     val pop = remember { Animatable(0.6f) }
     LaunchedEffect(Unit) { pop.animateTo(1f, spring(dampingRatio = 0.4f)) }
     Box(
-        Modifier.size(size.dp).scale(pop.value).clip(CircleShape).background(Color(0xFF1A56A0)).border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
+        modifier.size(size.dp).scale(pop.value).clip(CircleShape).background(Color(0xFF1A56A0)).border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Image(painterResource(R.drawable.ic_logo_foreground), contentDescription = "Creative Classes logo", modifier = Modifier.requiredSize((size * 1.6f).dp))
