@@ -34,6 +34,9 @@ object Sounds {
 
         /** Bouncy eight-note party tune on a steady beat: every call in the list is done. */
         DANCE(doubleArrayOf(523.25, 659.25, 783.99, 659.25, 698.46, 880.0, 783.99, 1046.50), gap = 0.18, decay = 0.1),
+
+        /** Two slow, soft "water drop" plinks: time for a break. */
+        BREAK(doubleArrayOf(1567.98, 1174.66), gap = 0.45, decay = 0.25),
     }
 
     private const val RATE = 44100

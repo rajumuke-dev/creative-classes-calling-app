@@ -52,6 +52,7 @@ data class SessionForm(
 /** Calling sessions are saved to private storage after every change, so work resumes after the app is closed. */
 class CallingViewModel(app: Application) : AndroidViewModel(app) {
     private val store = SessionStore(app)
+    val breakTimer = BreakTimer(app)
     private var currentId: String? = null
     private var saveJob: Job? = null
     var sessions by mutableStateOf<List<SavedSession>>(emptyList())

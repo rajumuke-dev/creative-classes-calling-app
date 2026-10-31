@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val vm: CallingViewModel by viewModels()
@@ -49,13 +53,21 @@ class MainActivity : ComponentActivity() {
                             Screen.REPORT -> ReportScreen(vm)
                         }
                     }
+                    BreakReminder(vm.breakTimer)
                 }
             } }
         }
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.RESUMED) { vm.breakTimer.run() } }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        vm.breakTimer.onAppStart()
     }
 
     override fun onStop() {
         vm.saveNow()
+        vm.breakTimer.onAppStop()
         super.onStop()
     }
 }

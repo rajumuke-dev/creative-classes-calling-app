@@ -27,6 +27,12 @@ selection when that filter is on, otherwise the whole class), a short dance play
 tune under confetti); if it hasn't played yet, Share Report / Next play it before the preview opens, and a three-note chime when the report preview opens. They play as interface sounds and stay
 silent when the phone is on silent/vibrate or system "Touch sounds" is off.
 
+**Take a break** (works like YouTube's reminder): after 15 minutes of continuous work a reminder appears with a
+glass filling with water, a soft "water drop" sound and a short health quote, asking you to drink water, stretch
+and rest your eyes. Tap **OK** to start the next 15 minutes, or **Change reminder** to pick every 15, 30, 45 or 60
+minutes (remembered). Time on parent calls counts as work; leaving the app for 30 minutes or closing it restarts
+the timer, and a reminder that falls due during a call appears when you return.
+
 **Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
 each card or use "Read marks from image" (on-device OCR, nothing is uploaded). Names are matched exactly, then
 by same words in any order, then by a unique close spelling. "By marks" lists scorers below (lowest first) or above (highest first) the
