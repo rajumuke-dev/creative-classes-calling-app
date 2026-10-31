@@ -89,6 +89,11 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     val marksReady get() = thresholdValue != null
 
+    /** Every student in the list being worked through has an outcome: the marks/absent selection when that filter is on, otherwise the whole class. */
+    val listDone: Boolean
+        get() = (if (filter == CallFilter.BY_MARKS || filter == CallFilter.ABSENT) visibleIndices else records.indices.toList())
+            .let { list -> list.isNotEmpty() && list.all { records[it].outcome != CallOutcome.NOT_CALLED } }
+
     /** Low marks are listed lowest score first so the weakest students are called first. */
     val visibleIndices: List<Int>
         get() = when (filter) {

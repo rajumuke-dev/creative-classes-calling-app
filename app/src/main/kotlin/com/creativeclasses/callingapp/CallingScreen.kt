@@ -105,14 +105,19 @@ fun CallingScreen(vm: CallingViewModel) {
         speakIndex = null
     }
     val bar by animateFloatAsState(if (progress.total == 0) 0f else progress.attempted.toFloat() / progress.total, label = "progress")
+    var danced by remember { mutableStateOf(false) }
+    var reportAfterDance by remember { mutableStateOf(false) }
+    val dance = { thenReport: Boolean ->
+        Sounds.play(context, Sounds.Cue.DANCE)
+        reaction = Reaction(ReactionKind.DANCE)
+        danced = true
+        reportAfterDance = thenReport
+    }
     val openReport = {
-        if (progress.total > 0 && progress.notCalled == 0) {
-            if (reaction?.kind != ReactionKind.DANCE) {
-                Sounds.play(context, Sounds.Cue.DANCE)
-                reaction = Reaction(ReactionKind.DANCE)
-            }
-        } else {
-            vm.prepareReport()
+        when {
+            reaction?.kind == ReactionKind.DANCE -> reportAfterDance = true
+            vm.listDone && !danced -> dance(true)
+            else -> vm.prepareReport()
         }
     }
 
@@ -227,9 +232,12 @@ fun CallingScreen(vm: CallingViewModel) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OUTCOME_CHOICES.forEach { (outcome, label) ->
                                 OutcomeChip(outcome, label, record.outcome == outcome) {
+                                    val wasDone = vm.listDone
                                     val chosen = if (record.outcome == outcome) CallOutcome.NOT_CALLED else outcome
                                     vm.updateRecord(i) { it.copy(outcome = chosen) }
-                                    if (chosen != CallOutcome.NOT_CALLED) {
+                                    if (chosen != CallOutcome.NOT_CALLED && !wasDone && vm.listDone) {
+                                        dance(false)
+                                    } else if (chosen != CallOutcome.NOT_CALLED) {
                                         Sounds.play(
                                             context,
                                             when (chosen) {
@@ -305,9 +313,10 @@ fun CallingScreen(vm: CallingViewModel) {
         ) { Text("Share Report") }
     }
     ReactionOverlay(reaction) {
-        val danced = reaction?.kind == ReactionKind.DANCE
+        val thenReport = reaction?.kind == ReactionKind.DANCE && reportAfterDance
         reaction = null
-        if (danced) vm.prepareReport()
+        reportAfterDance = false
+        if (thenReport) vm.prepareReport()
     }
     if (showMarks) MarksDialog(vm) { showMarks = false }
     vm.filterNotice?.let { notice ->
