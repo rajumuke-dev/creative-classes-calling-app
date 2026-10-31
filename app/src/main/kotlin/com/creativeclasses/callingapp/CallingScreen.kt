@@ -105,13 +105,23 @@ fun CallingScreen(vm: CallingViewModel) {
         speakIndex = null
     }
     val bar by animateFloatAsState(if (progress.total == 0) 0f else progress.attempted.toFloat() / progress.total, label = "progress")
+    val openReport = {
+        if (progress.total > 0 && progress.notCalled == 0) {
+            if (reaction?.kind != ReactionKind.DANCE) {
+                Sounds.play(context, Sounds.Cue.DANCE)
+                reaction = Reaction(ReactionKind.DANCE)
+            }
+        } else {
+            vm.prepareReport()
+        }
+    }
 
     Column(Modifier.fillMaxSize().statusBarsPadding()) {
         Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = vm::goToDashboard) { Text("\u2190 Back") }
             AnimatedCount("Called ${progress.attempted} / ${progress.total}", Modifier.weight(1f))
             TextButton(onClick = { showMarks = true }) { Text("Marks") }
-            TextButton(onClick = vm::prepareReport) { Text("Next \u2192") }
+            TextButton(onClick = openReport) { Text("Next \u2192") }
         }
         LinearProgressIndicator(
             progress = { bar },
@@ -289,12 +299,16 @@ fun CallingScreen(vm: CallingViewModel) {
             }
         }
         Button(
-            onClick = vm::prepareReport,
+            onClick = openReport,
             Modifier.fillMaxWidth().padding(12.dp).navigationBarsPadding().tiltOnTouch(8f),
             elevation = raisedButton(),
         ) { Text("Share Report") }
     }
-    ReactionOverlay(reaction) { reaction = null }
+    ReactionOverlay(reaction) {
+        val danced = reaction?.kind == ReactionKind.DANCE
+        reaction = null
+        if (danced) vm.prepareReport()
+    }
     if (showMarks) MarksDialog(vm) { showMarks = false }
     vm.filterNotice?.let { notice ->
         AlertDialog(

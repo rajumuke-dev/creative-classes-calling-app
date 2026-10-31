@@ -23,6 +23,8 @@ data class SavedSession(
     /** Marks threshold for the "By marks" filter. Blank until the teacher sets it. */
     val threshold: String,
     val marksRule: MarksRule,
+    /** Report text the teacher saved to share later, exactly as previewed/edited. Null until saved. */
+    val savedReport: String? = null,
 ) {
     val title: String
         get() = form.sessionName.ifBlank {
@@ -92,6 +94,7 @@ class SessionStore(context: Context) {
         put("marks", JSONArray(s.marks))
         put("threshold", s.threshold)
         put("marksRule", s.marksRule.name)
+        put("savedReport", s.savedReport ?: JSONObject.NULL)
     }
 
     private fun decode(o: JSONObject): SavedSession {
@@ -125,6 +128,7 @@ class SessionStore(context: Context) {
                 ?: List(o.getJSONArray("students").length()) { "" },
             threshold = o.optString("threshold", o.optString("lowBelow", "")),
             marksRule = MarksRule.values().firstOrNull { it.name == o.optString("marksRule") } ?: MarksRule.BELOW,
+            savedReport = if (o.has("savedReport")) o.str("savedReport") else null,
         )
     }
 

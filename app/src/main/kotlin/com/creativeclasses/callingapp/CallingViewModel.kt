@@ -71,6 +71,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     var form by mutableStateOf(SessionForm())
     var message by mutableStateOf<String?>(null)
     var reportText by mutableStateOf("")
+    private var savedReport: String? = null
     var date: LocalDate = LocalDate.now()
     private var workbook: XlsxWorkbook? = null
 
@@ -161,6 +162,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         marks = emptyList()
         threshold = ""
         marksRule = MarksRule.BELOW
+        savedReport = null
         form = SessionForm()
         date = LocalDate.now()
         message = null
@@ -176,6 +178,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         marks = session.marks
         threshold = session.threshold
         marksRule = session.marksRule
+        savedReport = session.savedReport
         filter = CallFilter.ALL
         resumeIndex = SessionProgress.of(session.records).resumeIndex ?: 0
         screen = Screen.CALLING
@@ -196,6 +199,12 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         refreshSessions()
     }
 
+    /** Keeps the previewed (possibly edited) report with the session so it can be shared later from the dashboard. */
+    fun saveReportForLater() {
+        savedReport = reportText
+        goToDashboard()
+    }
+
     /** Synchronous so it also works from onStop; the file is small. */
     fun saveNow() {
         saveJob?.cancel()
@@ -204,7 +213,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun write() {
         val id = currentId ?: return
-        store.save(SavedSession(id, form, date, students, records, marks, threshold, marksRule))
+        store.save(SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport))
     }
 
     private fun scheduleSave() {

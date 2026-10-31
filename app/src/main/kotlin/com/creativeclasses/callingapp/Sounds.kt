@@ -31,6 +31,9 @@ object Sounds {
 
         /** Slow falling "wah-wah" steps: call not received. */
         SAD(doubleArrayOf(783.99, 739.99, 698.46, 659.25), gap = 0.24, decay = 0.2),
+
+        /** Bouncy eight-note party tune on a steady beat: every call in the list is done. */
+        DANCE(doubleArrayOf(523.25, 659.25, 783.99, 659.25, 698.46, 880.0, 783.99, 1046.50), gap = 0.18, decay = 0.1),
     }
 
     private const val RATE = 44100

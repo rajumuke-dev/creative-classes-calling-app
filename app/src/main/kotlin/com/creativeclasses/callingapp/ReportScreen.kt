@@ -59,8 +59,11 @@ fun ReportScreen(vm: CallingViewModel) {
                 startVoice()
             }, Modifier.weight(1f)) { Text("\uD83C\uDF99 Speak") }
         }
-        Button(onClick = { shareReport(context, vm.reportText) }, Modifier.fillMaxWidth().padding(top = 8.dp).tiltOnTouch(8f), elevation = raisedButton()) {
-            Text("Share on WhatsApp")
+        Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = vm::saveReportForLater, Modifier.weight(1f)) { Text("Save for Later") }
+            Button(onClick = { shareReport(context, vm.reportText) }, Modifier.weight(1f).tiltOnTouch(8f), elevation = raisedButton()) {
+                Text("Share on WhatsApp")
+            }
         }
     }
 }

@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.creativeclasses.report.CallOutcome
 import com.creativeclasses.report.SessionProgress
@@ -56,6 +57,7 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGL
 @Composable
 fun DashboardScreen(vm: CallingViewModel) {
     var pendingDelete by remember { mutableStateOf<SavedSession?>(null) }
+    val context = LocalContext.current
 
     Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp)) {
         HeroHeader("Creative Classes", "Calling Sessions")
@@ -64,7 +66,13 @@ fun DashboardScreen(vm: CallingViewModel) {
         } else {
             LazyColumn(Modifier.weight(1f).padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 itemsIndexed(vm.sessions, key = { _, s -> s.id }) { i, session ->
-                    SessionCard(session, Modifier.animateItem().enter3D(80 * i.coerceAtMost(6)).tiltOnTouch(), onOpen = { vm.openSession(session) }, onDelete = { pendingDelete = session })
+                    SessionCard(
+                        session,
+                        Modifier.animateItem().enter3D(80 * i.coerceAtMost(6)).tiltOnTouch(),
+                        onOpen = { vm.openSession(session) },
+                        onDelete = { pendingDelete = session },
+                        onShare = session.savedReport?.let { report -> { shareReport(context, report) } },
+                    )
                 }
             }
         }
@@ -88,7 +96,7 @@ fun DashboardScreen(vm: CallingViewModel) {
 }
 
 @Composable
-private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () -> Unit, onDelete: () -> Unit) {
+private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () -> Unit, onDelete: () -> Unit, onShare: (() -> Unit)?) {
     val p = SessionProgress.of(session.records)
     ElevatedCard(
         modifier.fillMaxWidth().animateContentSize(),
@@ -128,6 +136,12 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text("Follow-ups ${p.followUps}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+            }
+            if (onShare != null) {
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("\uD83D\uDCC4 Report saved", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    OutlinedButton(onClick = onShare) { Text("Share Saved Report") }
+                }
             }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onOpen, Modifier.weight(1f), elevation = raisedButton()) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }

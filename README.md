@@ -10,7 +10,8 @@ Android app for teachers to call parents from an Excel list, record outcomes and
   confirm session (purpose, class, etc.) → record calls (dial either parent contact, outcome, concerns, remark,
   follow-up; numbers that are not 10 digits are flagged invalid and can't be dialled) →
   **Share Report** → editable preview → **Share on WhatsApp** (`ACTION_SEND`, `text/plain`; falls back to the
-  share sheet). Nothing is ever sent automatically.
+  share sheet), or **Save for Later** to keep the previewed text with the session and share it later in one tap
+  from the dashboard (**Share Saved Report**). Nothing is ever sent automatically.
 
 Sessions are saved on the phone after every change (private app storage, one JSON file per session). The
 dashboard lists every session with called / total, the outcome breakdown and the next student to call;
@@ -21,7 +22,8 @@ short pause; Concern Raised and Call Not Received via **Done ✓**) and show a c
 flag and remark preview. Tap a card heading to reopen it.
 Short synthesised sounds and a brief full-screen animation mark outcomes: confetti and a "ta-da" for Contacted,
 a check-mark "visit booked" ripple and doorbell for Will Come to Visit, gentle rain and a falling tune for Call Not
-Received, one soft note for the others, and a three-note chime when the report preview opens. They play as interface sounds and stay
+Received, one soft note for the others. Once every student has an outcome, Share Report / Next first plays a
+short dance (dancers bouncing to a party tune under confetti) before the preview opens, and a three-note chime when the report preview opens. They play as interface sounds and stay
 silent when the phone is on silent/vibrate or system "Touch sounds" is off.
 
 **Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
