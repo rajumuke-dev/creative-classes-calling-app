@@ -60,9 +60,15 @@ object MarksOcr {
             val column = marksColumn(lines, page.width)
             return rows.map { row ->
                 val text = row.sortedBy { it.second.left }.joinToString(" ") { it.first }
-                val missing = column != null && row.none { column.overlaps(it.second) }
-                val recovered = if (missing) rereadCell(recognizer, page, column!!, row) else null
-                if (recovered != null) "$text $recovered" else text
+                val inColumn = column?.let { c -> row.filter { c.overlaps(it.second) } }.orEmpty()
+                // Lone digits are sometimes dropped or misread as a letter (e.g. "9" as "o"); read those cells again.
+                val unreadable = column != null && inColumn.none { MARK_CELL.matches(it.first.trim().substringAfterLast(' ')) }
+                val recovered = if (unreadable) rereadCell(recognizer, page, column!!, row) else null
+                when {
+                    recovered == null -> text
+                    inColumn.isEmpty() -> "$text $recovered"
+                    else -> "${text.substringBeforeLast(' ')} $recovered"
+                }
             }
         } finally {
             recognizer.close()
