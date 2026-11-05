@@ -42,6 +42,24 @@ class MarksTest {
     }
 
     @Test
+    fun `splits side by side tables and repairs clipped absent marks`() {
+        val rows = MarkRowParser.parse(
+            listOf(
+                "SR.NO Students name Marks 20 SR.NO Students name Marks 20",
+                "1 | Ansh Gupta | AB | 1 | |Aarush Nawale | AB",
+                "3 Anvika Pande | 20 | 3 | Aaryadhya Waykar | A",
+                "Atharva Pawar | AB | 8 | Anushka More | 20",
+                "53 | Gaurang Babar | 18",
+            ),
+        )
+        assertEquals(
+            listOf("Ansh Gupta" to "AB", "Aarush Nawale" to "AB", "Anvika Pande" to "20", "Aaryadhya Waykar" to "AB",
+                "Atharva Pawar" to "AB", "Anushka More" to "20", "Gaurang Babar" to "18"),
+            rows.map { it.name to it.marks },
+        )
+    }
+
+    @Test
     fun `matches exact reordered and closely spelled names`() {
         val students = listOf("Asha Verma", "Kumar Ravi", "Meenakshi Rao", "Omar Shah")
         val result = NameMatcher.match(
@@ -57,6 +75,14 @@ class MarksTest {
         val result = NameMatcher.match(listOf(MarkRow("Sneha Patel", "10")), listOf("Sneha Patil", "Sneha Patal"))
         assertTrue(result.matched.isEmpty())
         assertEquals(1, result.unmatched.size)
+    }
+
+    @Test
+    fun `name missing a part matches the single student containing all its words`() {
+        val students = listOf("Charanjeet Ganganmale", "Shivam Kedar", "Sarthak Kedar")
+        val result = NameMatcher.match(listOf(MarkRow("Ganganmale", "AB"), MarkRow("Kedar", "10")), students)
+        assertEquals(mapOf(0 to "AB"), result.matched)
+        assertEquals(listOf(MarkRow("Kedar", "10")), result.unmatched)
     }
 
     @Test

@@ -46,7 +46,9 @@ the timer, and a reminder that falls due during a call appears when you return.
 
 **Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
 each card or use "Read marks from image" (on-device OCR, nothing is uploaded). Names are matched exactly, then
-by same words in any order, then by a unique close spelling. "By marks" lists scorers below (lowest first) or above (highest first) the
+by same words in any order, then by a unique close spelling, then by the only student whose name contains all the
+marklist name's words (e.g. surname only). Side-by-side tables are split into separate rows, and a marks cell the OCR
+skipped or misread (e.g. "9" read as "o") is read again on its own. "By marks" lists scorers below (lowest first) or above (highest first) the
 mark; "Absent" lists AB. OCR can misread digits, so review the marks; the import notice lists
 unmatched names and students left without marks. Marks are never added to the report.
 
