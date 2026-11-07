@@ -4,7 +4,12 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.core.content.FileProvider
 import com.creativeclasses.report.PhoneNumbers
+import com.creativeclasses.report.SessionWorkbook
+import java.io.File
+import java.io.IOException
 
 private const val WHATSAPP_PACKAGE = "com.whatsapp"
 
@@ -19,6 +24,24 @@ fun shareReport(context: Context, text: String) {
     } catch (e: ActivityNotFoundException) {
         context.startActivity(Intent.createChooser(send, "Share report"))
     }
+}
+
+/** Builds the Excel file with [export] and opens the share sheet (WhatsApp, Drive, Gmail, ...); the teacher picks where it goes. */
+fun shareExcel(context: Context, export: () -> File) {
+    val file = try {
+        export()
+    } catch (e: IOException) {
+        Toast.makeText(context, "Could not create the Excel file. Please try again.", Toast.LENGTH_LONG).show()
+        return
+    }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = SessionWorkbook.MIME
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, file.nameWithoutExtension)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(send, "Share Excel"))
 }
 
 /** Opens the SMS app with the message pre-filled; nothing is sent until the teacher presses Send. */

@@ -80,7 +80,7 @@ import com.creativeclasses.report.SessionProgress
 /** Outcomes that need nothing more, so the card minimises itself once chosen. */
 private val AUTO_COLLAPSE = setOf(CallOutcome.CONTACTED, CallOutcome.WILL_VISIT, CallOutcome.CALL_LATER)
 
-private val OUTCOME_CHOICES = listOf(
+internal val OUTCOME_CHOICES = listOf(
     CallOutcome.CONTACTED to "Contacted",
     CallOutcome.CONCERN_RAISED to "Concern Raised",
     CallOutcome.WILL_VISIT to "Will Come to Visit",
@@ -275,7 +275,18 @@ fun CallingScreen(vm: CallingViewModel) {
                                 .firstOrNull { PhoneNumbers.isValid(it) }
                             if (reachable != null) {
                                 val sendText = {
-                                    textParent(context, reachable, ParentMessage.notReached(record.studentName, vm.form.teacher, vm.form.availability))
+                                    textParent(
+                                        context,
+                                        reachable,
+                                        ParentMessage.notReached(
+                                            record.studentName,
+                                            vm.form.teacher,
+                                            vm.form.availability,
+                                            subject = vm.form.subject,
+                                            exam = vm.form.exam,
+                                            mark = vm.marks.getOrNull(i),
+                                        ),
+                                    )
                                 }
                                 Column {
                                     Button(

@@ -131,6 +131,7 @@ fun SetupScreen(vm: CallingViewModel) {
         Field("Section", form.section) { vm.form = form.copy(section = it) }
         Field("Board (e.g. CBSE)", form.board) { vm.form = form.copy(board = it) }
         Field("Exam", form.exam) { vm.form = form.copy(exam = it) }
+        Field("Subject (e.g. History)", form.subject) { vm.form = form.copy(subject = it) }
         Field("Teacher", form.teacher) { vm.form = form.copy(teacher = it) }
         Field("Teacher available (e.g. on Monday from 4 PM to 7 PM)", form.availability) { vm.form = form.copy(availability = it) }
         Text(

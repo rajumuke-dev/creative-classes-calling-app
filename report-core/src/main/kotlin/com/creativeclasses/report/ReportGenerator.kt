@@ -121,7 +121,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
             r.noContact() -> listOf("Contact number not found, so the parent could not be called.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.NOT_CALLED -> listOf("Call has not been made yet.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.NO_ANSWER -> listOf("Parent could not be reached.") + sentenceOrEmpty(remark)
-            r.outcome == CallOutcome.WILL_VISIT -> listOf("Parent will come to visit the school.") + sentenceOrEmpty(remark)
+            r.outcome == CallOutcome.WILL_VISIT -> listOf("Parent will come to visit the class.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.CALL_LATER -> listOf("Parent is to be called again later.") + sentenceOrEmpty(remark)
             r.hasConcern() -> concernSentences(r, remark)
             remark != null -> listOf(sentence(remark))

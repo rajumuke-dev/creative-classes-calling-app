@@ -91,7 +91,7 @@ class ReportGeneratorTest {
         val text = generator.generate(session, ok(2) + CallRecord("Asha Rao", CallOutcome.WILL_VISIT)).text
         assertContains(text, "Parents Contacted: 3")
         assertContains(text, "Will Come to Visit: 1")
-        assertContains(text, "Asha Rao\nParent will come to visit the school.")
+        assertContains(text, "Asha Rao\nParent will come to visit the class.")
         assertContains(text, "Completed Successfully")
     }
 

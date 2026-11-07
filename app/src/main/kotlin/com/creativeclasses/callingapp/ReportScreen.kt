@@ -65,5 +65,10 @@ fun ReportScreen(vm: CallingViewModel) {
                 Text("Share on WhatsApp")
             }
         }
+        Button(
+            onClick = { shareExcel(context, vm::exportCurrentExcel) },
+            Modifier.fillMaxWidth().padding(top = 8.dp).tiltOnTouch(8f),
+            elevation = raisedButton(),
+        ) { Text("\uD83D\uDCCA Share Excel (all students)") }
     }
 }

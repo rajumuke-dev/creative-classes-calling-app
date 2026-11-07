@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.Column
@@ -73,6 +74,7 @@ fun DashboardScreen(vm: CallingViewModel) {
                         onOpen = { vm.openSession(session) },
                         onDelete = { pendingDelete = session },
                         onShare = session.savedReport?.let { report -> { shareReport(context, report) } },
+                        onShareExcel = { shareExcel(context) { vm.exportExcel(session) } },
                     )
                 }
             }
@@ -110,8 +112,18 @@ fun DashboardScreen(vm: CallingViewModel) {
 }
 
 @Composable
-private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () -> Unit, onDelete: () -> Unit, onShare: (() -> Unit)?) {
+private fun SessionCard(
+    session: SavedSession,
+    modifier: Modifier,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onShare: (() -> Unit)?,
+    onShareExcel: () -> Unit,
+) {
     val p = SessionProgress.of(session.records)
+    val next = session.nextInList()
+    var sheet by remember { mutableStateOf<String?>(null) }
+    sheet?.let { StudentSheet(session, it) { sheet = null } }
     ElevatedCard(
         modifier.fillMaxWidth().animateContentSize(),
         shape = CardShape,
@@ -124,7 +136,10 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
                     Text(session.title, style = MaterialTheme.typography.titleSmall)
                     Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
                 }
-                AnimatedCount("${p.attempted} / ${p.total} called")
+                AnimatedCount(
+                    "${p.attempted} / ${p.total} called",
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { sheet = "Called" }.padding(4.dp),
+                )
             }
             val progress by animateFloatAsState(if (p.total == 0) 0f else p.attempted.toFloat() / p.total, label = "progress")
             LinearProgressIndicator(
@@ -133,23 +148,35 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
                 trackColor = MaterialTheme.colorScheme.primaryContainer,
                 strokeCap = StrokeCap.Round,
             )
+            val onTile = { t: StatTile -> sheet = t.label }
             StatRow(
+                onTile,
                 StatTile(p.contacted, "Contacted", CallOutcome.CONTACTED),
                 StatTile(p.concerns, "Concern", CallOutcome.CONCERN_RAISED),
                 StatTile(p.willVisit, "Will visit", CallOutcome.WILL_VISIT),
             )
             StatRow(
+                onTile,
                 StatTile(p.noAnswer, "Not received", CallOutcome.NO_ANSWER),
                 StatTile(p.callLater, "Call later", CallOutcome.CALL_LATER),
                 StatTile(p.notCalled, "Not called", CallOutcome.NOT_CALLED),
             )
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    p.resumeIndex?.let { "Next: ${session.records[it].studentName}" } ?: "All students have been called.",
+                    when {
+                        next != null -> "Next: ${session.records[next].studentName}"
+                        p.resumeIndex == null -> "All students have been called."
+                        else -> "All students in this list have been called."
+                    },
                     Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Text("Follow-ups ${p.followUps}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary)
+                Text(
+                    "Follow-ups ${p.followUps}",
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { sheet = "Follow-ups" }.padding(4.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
             }
             if (onShare != null) {
                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -159,6 +186,7 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
             }
             Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onOpen, Modifier.weight(1f), elevation = raisedButton()) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }
+                OutlinedButton(onClick = onShareExcel) { Text("Excel") }
                 OutlinedButton(onClick = onDelete) { Text("Delete") }
             }
         }
@@ -167,14 +195,15 @@ private fun SessionCard(session: SavedSession, modifier: Modifier, onOpen: () ->
 
 private class StatTile(val value: Int, val label: String, val outcome: CallOutcome)
 
-/** Three equal-width count tiles, tinted with the outcome colour used on the calling screen. */
+/** Three equal-width count tiles, tinted with the outcome colour used on the calling screen. Tapping one opens its students in [StudentSheet]. */
 @Composable
-private fun StatRow(vararg tiles: StatTile) {
+private fun StatRow(onClick: (StatTile) -> Unit, vararg tiles: StatTile) {
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         tiles.forEach { t ->
             val color = outcomeColor(t.outcome)
             Column(
-                Modifier.weight(1f).background(color.copy(alpha = 0.12f), RoundedCornerShape(12.dp)).padding(vertical = 6.dp),
+                Modifier.weight(1f).tiltOnTouch().clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = 0.12f)).clickable { onClick(t) }
+                    .padding(vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("${t.value}", style = MaterialTheme.typography.titleMedium, color = color)

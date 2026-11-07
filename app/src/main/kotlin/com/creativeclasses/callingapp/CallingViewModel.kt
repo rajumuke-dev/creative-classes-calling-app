@@ -17,12 +17,14 @@ import com.creativeclasses.report.MarksRule
 import com.creativeclasses.report.NameMatcher
 import com.creativeclasses.report.PhoneNumbers
 import com.creativeclasses.report.ReportGenerator
-import com.creativeclasses.report.SessionProgress
+import com.creativeclasses.report.SessionWorkbook
+import com.creativeclasses.report.SheetRow
 import com.creativeclasses.report.needsFollowUp
 import com.creativeclasses.report.StudentImporter
 import com.creativeclasses.report.XlsxReader
 import com.creativeclasses.report.XlsxWorkbook
 import android.net.Uri
+import java.io.File
 import java.io.InputStream
 import java.time.LocalDate
 import java.util.UUID
@@ -38,12 +40,37 @@ enum class CallFilter(val label: String) {
     ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up"), BY_MARKS("By marks"), ABSENT("Absent")
 }
 
+private fun thresholdOf(text: String) = text.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+
+/** Students shown for [filter], in calling order. Low marks are listed lowest score first so the weakest students are called first. */
+fun visibleIndices(filter: CallFilter, records: List<CallRecord>, marks: List<String>, rule: MarksRule, threshold: String): List<Int> =
+    when (filter) {
+        CallFilter.BY_MARKS -> records.indices.filter { Marks.matches(marks.getOrNull(it), rule, thresholdOf(threshold)) }.let { hits ->
+            if (rule == MarksRule.BELOW) hits.sortedBy { Marks.parse(marks[it]).score }
+            else hits.sortedByDescending { Marks.parse(marks[it]).score }
+        }
+        else -> records.indices.filter {
+            when (filter) {
+                CallFilter.NOT_CALLED -> records[it].outcome == CallOutcome.NOT_CALLED
+                CallFilter.FOLLOW_UP -> records[it].needsFollowUp()
+                CallFilter.ABSENT -> Marks.isAbsent(marks.getOrNull(it))
+                else -> true
+            }
+        }
+    }
+
+/** Next student to call in the list "Continue calling" reopens (the saved filter), or null when that list is done. */
+fun SavedSession.nextInList(): Int? =
+    visibleIndices(filter, records, marks, marksRule, threshold).firstOrNull { records[it].outcome == CallOutcome.NOT_CALLED }
+
 data class SessionForm(
     val sessionName: String = "",
     val className: String = "",
     val section: String = "",
     val board: String = "",
     val exam: String = "",
+    /** Told to parents who were not reached, together with the student's mark. */
+    val subject: String = "",
     val purpose: CallingPurpose = CallingPurpose.EXAM_RESULT,
     val customPurpose: String = "",
     val teacher: String = "",
@@ -82,7 +109,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         refreshSessions()
     }
 
-    private val thresholdValue get() = threshold.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
+    private val thresholdValue get() = thresholdOf(threshold)
 
     fun matchesMarks(index: Int) = Marks.matches(marks.getOrNull(index), marksRule, thresholdValue)
 
@@ -97,22 +124,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         get() = (if (filter == CallFilter.BY_MARKS || filter == CallFilter.ABSENT) visibleIndices else records.indices.toList())
             .let { list -> list.isNotEmpty() && list.all { records[it].outcome != CallOutcome.NOT_CALLED } }
 
-    /** Low marks are listed lowest score first so the weakest students are called first. */
-    val visibleIndices: List<Int>
-        get() = when (filter) {
-            CallFilter.BY_MARKS -> records.indices.filter { matchesMarks(it) }.let { hits ->
-                if (marksRule == MarksRule.BELOW) hits.sortedBy { Marks.parse(marks[it]).score }
-                else hits.sortedByDescending { Marks.parse(marks[it]).score }
-            }
-            else -> records.indices.filter {
-                when (filter) {
-                    CallFilter.NOT_CALLED -> records[it].outcome == CallOutcome.NOT_CALLED
-                    CallFilter.FOLLOW_UP -> records[it].needsFollowUp()
-                    CallFilter.ABSENT -> Marks.isAbsent(marks.getOrNull(it))
-                    else -> true
-                }
-            }
-        }
+    val visibleIndices: List<Int> get() = visibleIndices(filter, records, marks, marksRule, threshold)
 
     fun setMark(index: Int, text: String) {
         marks = marks.toMutableList().also { it[index] = text.take(8) }
@@ -193,8 +205,9 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         threshold = session.threshold
         marksRule = session.marksRule
         savedReport = session.savedReport
-        filter = CallFilter.ALL
-        resumeIndex = SessionProgress.of(session.records).resumeIndex ?: 0
+        filter = session.filter
+        // Position in the visible (possibly filtered) list, as that is what the calling screen scrolls.
+        resumeIndex = visibleIndices.indexOfFirst { records[it].outcome == CallOutcome.NOT_CALLED }.coerceAtLeast(0)
         screen = Screen.CALLING
     }
 
@@ -227,8 +240,48 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun write() {
         val id = currentId ?: return
-        store.save(SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport))
+        store.save(snapshot(id))
     }
+
+    private fun snapshot(id: String) = SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport, filter)
+
+    /** Saves first, then exports the open session with the report text being previewed. */
+    fun exportCurrentExcel(): File {
+        saveNow()
+        return exportExcel(snapshot(currentId ?: "current"), reportText.takeIf { it.isNotBlank() })
+    }
+
+    /**
+     * Writes "<session name>.xlsx" from the session's latest saved state, so the file always matches the calls made.
+     * The report sheet uses [reportText], else the saved report, else a fresh report for the whole class.
+     */
+    fun exportExcel(session: SavedSession, reportText: String? = null): File {
+        val calling = callingSession(session.form, session.date)
+        val rows = session.records.mapIndexed { i, record ->
+            SheetRow(session.students.getOrNull(i) ?: ImportedStudent(record.studentName, null, null), record, session.marks.getOrNull(i))
+        }
+        val report = reportText ?: session.savedReport ?: ReportGenerator().generate(
+            calling,
+            rows.map { r -> r.record.copy(contactMissing = listOfNotNull(r.student.contact1, r.student.contact2).none { PhoneNumbers.isValid(it) }) },
+        ).text
+        // Only the latest export is kept; it is rebuilt on every share.
+        val dir = File(getApplication<Application>().cacheDir, "exports").apply { deleteRecursively(); mkdirs() }
+        return File(dir, SessionWorkbook.fileName(session.title)).also { file ->
+            file.outputStream().use { SessionWorkbook.write(it, calling.copy(sessionName = session.title), session.form.subject, rows, report) }
+        }
+    }
+
+    private fun callingSession(form: SessionForm, date: LocalDate) = CallingSession(
+        sessionName = form.sessionName,
+        className = form.className,
+        section = form.section,
+        board = form.board,
+        exam = form.exam,
+        purpose = form.purpose,
+        customPurpose = form.customPurpose,
+        date = date,
+        teacher = form.teacher,
+    )
 
     private fun scheduleSave() {
         saveJob?.cancel()
@@ -303,22 +356,18 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun updateRecord(index: Int, change: (CallRecord) -> CallRecord) {
-        records = records.toMutableList().also { it[index] = change(it[index]) }
-        scheduleSave()
+        val current = records[index]
+        val updated = change(current)
+        if (updated == current) return
+        records = records.toMutableList().also { it[index] = updated }
+        // A saved report no longer reflects the calls, so it must not be shared from the dashboard.
+        savedReport = null
+        // A recorded call is written at once so it survives the app being killed; remark typing stays debounced.
+        if (updated.outcome != current.outcome) saveNow() else scheduleSave()
     }
 
     fun prepareReport() {
-        val session = CallingSession(
-            sessionName = form.sessionName,
-            className = form.className,
-            section = form.section,
-            board = form.board,
-            exam = form.exam,
-            purpose = form.purpose,
-            customPurpose = form.customPurpose,
-            date = date,
-            teacher = form.teacher,
-        )
+        val session = callingSession(form, date)
         val scope = visibleIndices.sorted()
         if (scope.isEmpty()) {
             filterNotice = "No students in this view to report. Change the filter first."

@@ -25,6 +25,8 @@ data class SavedSession(
     val marksRule: MarksRule,
     /** Report text the teacher saved to share later, exactly as previewed/edited. Null until saved. */
     val savedReport: String? = null,
+    /** Filter active when the session was left, so "Continue calling" returns to the same list. */
+    val filter: CallFilter = CallFilter.ALL,
 ) {
     val title: String
         get() = form.sessionName.ifBlank {
@@ -69,6 +71,7 @@ class SessionStore(context: Context) {
             put("section", s.form.section)
             put("board", s.form.board)
             put("exam", s.form.exam)
+            put("subject", s.form.subject)
             put("purpose", s.form.purpose.name)
             put("customPurpose", s.form.customPurpose)
             put("teacher", s.form.teacher)
@@ -96,10 +99,22 @@ class SessionStore(context: Context) {
         put("threshold", s.threshold)
         put("marksRule", s.marksRule.name)
         put("savedReport", s.savedReport ?: JSONObject.NULL)
+        put("filter", s.filter.name)
     }
 
     private fun decode(o: JSONObject): SavedSession {
         val f = o.getJSONObject("form")
+        val marks = o.optJSONArray("marks")?.let { a -> (0 until a.length()).map { a.getString(it) } }
+            ?: List(o.getJSONArray("students").length()) { "" }
+        val threshold = o.optString("threshold", o.optString("lowBelow", ""))
+        // Sessions saved before the filter was stored: reopen on By marks if a marks filter was set (as startCalling
+        // does) and drop the saved report, which may predate later calls.
+        val legacy = !o.has("filter")
+        val legacyFilter = if (marks.any { it.isNotBlank() } && threshold.trim().toDoubleOrNull()?.isFinite() == true) {
+            CallFilter.BY_MARKS
+        } else {
+            CallFilter.ALL
+        }
         return SavedSession(
             id = o.getString("id"),
             date = LocalDate.parse(o.getString("date")),
@@ -109,6 +124,7 @@ class SessionStore(context: Context) {
                 section = f.getString("section"),
                 board = f.getString("board"),
                 exam = f.getString("exam"),
+                subject = f.optString("subject"),
                 purpose = CallingPurpose.valueOf(f.getString("purpose")),
                 customPurpose = f.getString("customPurpose"),
                 teacher = f.getString("teacher"),
@@ -126,11 +142,11 @@ class SessionStore(context: Context) {
                     followUpRequired = r.getBoolean("followUp"),
                 )
             },
-            marks = o.optJSONArray("marks")?.let { a -> (0 until a.length()).map { a.getString(it) } }
-                ?: List(o.getJSONArray("students").length()) { "" },
-            threshold = o.optString("threshold", o.optString("lowBelow", "")),
+            marks = marks,
+            threshold = threshold,
             marksRule = MarksRule.values().firstOrNull { it.name == o.optString("marksRule") } ?: MarksRule.BELOW,
-            savedReport = if (o.has("savedReport")) o.str("savedReport") else null,
+            savedReport = if (o.has("savedReport") && !legacy) o.str("savedReport") else null,
+            filter = if (legacy) legacyFilter else CallFilter.values().firstOrNull { it.name == o.optString("filter") } ?: CallFilter.ALL,
         )
     }
 

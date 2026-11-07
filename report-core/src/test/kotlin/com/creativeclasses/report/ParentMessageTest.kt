@@ -40,4 +40,30 @@ class ParentMessageTest {
         assertContains(text, "Kindly call us back at your convenience.\n\nThank you,\nCreative Classes")
         assertFalse(text.contains("Priya"))
     }
+
+    @Test
+    fun `message tells the mark with subject and exam`() {
+        val text = ParentMessage.notReached("Asha Rao", subject = " History ", exam = "Unit Test 1", mark = " 19 ")
+        assertContains(text, "could not reach you. Asha Rao scored 19 marks in History (Unit Test 1). Kindly call us back")
+    }
+
+    @Test
+    fun `absent student is reported as absent`() {
+        assertContains(ParentMessage.notReached("Asha Rao", subject = "History", mark = "AB"), "Asha Rao was absent for History.")
+        assertContains(ParentMessage.notReached(" ", mark = "ab"), "Your child was absent for the exam.")
+    }
+
+    @Test
+    fun `mark without subject or exam`() {
+        assertContains(ParentMessage.notReached("Asha Rao", exam = "Unit Test 1", mark = "29"), "Asha Rao scored 29 marks in Unit Test 1.")
+        assertContains(ParentMessage.notReached("Asha Rao", mark = "9"), "Asha Rao scored 9 marks. Kindly")
+    }
+
+    @Test
+    fun `no mark leaves out the marks line`() {
+        val expected = ParentMessage.notReached("Asha Rao")
+        assertEquals(expected, ParentMessage.notReached("Asha Rao", subject = "History", exam = "Unit Test 1", mark = " "))
+        assertEquals(expected, ParentMessage.notReached("Asha Rao", subject = "History", mark = null))
+        assertContains(expected, "could not reach you. Kindly call us back")
+    }
 }

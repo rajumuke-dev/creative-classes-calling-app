@@ -11,11 +11,23 @@ Android app for teachers to call parents from an Excel list, record outcomes and
   follow-up; numbers that are not 10 digits are flagged invalid and can't be dialled) →
   **Share Report** → editable preview → **Share on WhatsApp** (`ACTION_SEND`, `text/plain`; falls back to the
   share sheet), or **Save for Later** to keep the previewed text with the session and share it later in one tap
-  from the dashboard (**Share Saved Report**). Nothing is ever sent automatically.
+  from the dashboard (**Share Saved Report**). Recording or changing a call afterwards discards the saved report, so
+  an outdated report is never shared; press **Share Report** again for the latest. Nothing is ever sent automatically.
+  **Share Excel** (report preview) and **Excel** (each dashboard card) share `<session name>.xlsx` through the share
+  sheet (WhatsApp, Drive, Gmail, ...). It is rebuilt from the saved session on every tap, so it always has the latest
+  calls: a "Calls" sheet with every student (marks, call status, concerns, remarks, follow-up, contacts) under a
+  title, session details and summary, with a frozen header and name column, filters, striped rows and colour-coded
+  status; and a "Report" sheet with the report text laid out with headings and bold values. Both sheets print to fit
+  the page width with a page-number footer.
 
 Sessions are saved on the phone after every change (private app storage, one JSON file per session). The
-dashboard lists every session with called / total, the outcome breakdown and the next student to call;
-"Continue calling" opens the list at the first student not yet called. The calling list can be filtered
+dashboard lists every session with called / total, the outcome breakdown and the next student to call. Tapping any
+count (called, an outcome tile or Follow-ups) opens a swipe-up sheet of those students with their marks: chips switch
+between counts, students can be sorted by marks, and tapping a student shows their call (status, concerns, remark,
+contact). Nothing can be changed there; calls are recorded on the calling screen.
+"Continue calling" reopens the filter that was active (e.g. By marks) at the first student in it not yet called; the
+dashboard's "Next:" name follows the same list. Sessions
+from older app versions keep their calls, reopen on By marks if a marks filter was set, and drop their saved report. The calling list can be filtered
 (All / Not called / Follow-up). Call Not Received and Call Later count as called (attempted).
 Student cards minimise once an outcome is recorded (Contacted, Will Come to Visit and Call Later after a
 short pause; Concern Raised and Call Not Received via **Done ✓**) and show a coloured outcome badge, follow-up
@@ -25,6 +37,8 @@ sent until you press Send). It comes from Creative Classes and tells the parent 
 (e.g. "Priya Sharma is available on Monday from 4 PM to 7 PM. Please do visit the class."), using the Teacher and
 "Teacher available" fields of the New Calling Session form; both carry over from the most recent session. If a
 session has no availability yet, Send text message asks for it first; tap the availability line to change it.
+When the student has an imported mark, the message also states it with the Subject and Exam fields
+(e.g. "Asha Rao scored 19 marks in History (Unit Test 1)." or "Asha Rao was absent for History (Unit Test 1).").
 Short synthesised sounds and a brief full-screen animation mark outcomes: confetti and a "ta-da" for Contacted,
 a check-mark "visit booked" ripple and doorbell for Will Come to Visit, gentle rain and a falling tune for Call Not
 Received, one soft note for the others. When the last student in the list being called gets an outcome (the By marks / Absent
