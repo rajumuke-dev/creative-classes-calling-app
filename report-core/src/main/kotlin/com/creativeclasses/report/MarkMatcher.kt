@@ -8,22 +8,52 @@ data class MarkMatchResult(
     val unmatched: List<MarkRow>,
 )
 
-/** Turns text lines read from a marklist (one string per table row) into name/marks pairs. */
+/**
+ * Turns text lines read from a marklist (one string per table row) into name/marks pairs.
+ * Works token by token, so any number of side-by-side tables is handled even when OCR misses a serial number:
+ * a name is a run of words, its mark is the token right after it; serials and noise end the run.
+ */
 object MarkRowParser {
-    private val ROW = Regex("""^\s*\d{0,3}[.)]?\s*(\p{L}[\p{L} .'’-]*?)\s+(\d{1,3}(?:\.\d{1,2})?|AB|ABS|ABSENT|AR|A|-|–)\s*$""", RegexOption.IGNORE_CASE)
-    /** Side-by-side tables read as one line: a new entry starts at a serial number that follows a mark. */
-    private val NEXT_ENTRY = Regex("""(?<=\b(?:AB|ABS|ABSENT|AR|A|\d{1,3}))\s+(?=\d{1,3}\s+\p{L})""", RegexOption.IGNORE_CASE)
+    private val NAME_WORD = Regex("""\p{L}[\p{L}.'’-]*""")
+    private val SCORE = Regex("""\d{1,3}(?:\.\d{1,2})?""")
+    private val ABSENT = setOf("AB", "ABS", "ABSENT")
+    /** OCR misreads of "AB" (clipped or a wrong last letter); only trusted at the end of an entry. */
+    private val ABSENT_MISREAD = setOf("A", "AR", "AE", "A8")
+    private val NO_MARK = setOf("-", "–")
     private val BORDER = Regex("[|\\[\\]_:]")
-    private val HEADER_WORDS = setOf("marks", "subject", "exam", "student", "students", "date")
+    private val HEADER_WORDS = setOf("marks", "subject", "exam", "student", "students", "date", "marklist", "batch")
 
     fun parse(lines: List<String>): List<MarkRow> = lines.flatMap { line ->
-        line.replace(BORDER, " ").trim().split(NEXT_ENTRY).mapNotNull { entry ->
-            val m = ROW.matchEntire(entry.trim()) ?: return@mapNotNull null
-            val name = m.groupValues[1].trim()
-            if (NameMatcher.words(name).any { it in HEADER_WORDS }) return@mapNotNull null
-            // OCR sometimes clips a trailing "AB" to "A"/"AR".
-            val marks = m.groupValues[2].replace('–', '-').let { if (it.uppercase() in setOf("A", "AR")) "AB" else it }
-            MarkRow(name, marks)
+        val tokens = line.replace(BORDER, " ").trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (NameMatcher.words(line).any { it in HEADER_WORDS }) emptyList() else entries(tokens)
+    }
+
+    private fun entries(tokens: List<String>): List<MarkRow> {
+        val rows = mutableListOf<MarkRow>()
+        val name = mutableListOf<String>()
+        val serial = tokens.firstOrNull()?.takeIf { SCORE.matches(it) }
+        tokens.forEachIndexed { i, token ->
+            val next = tokens.getOrNull(i + 1)
+            val mark = if (name.isEmpty()) null else markOf(token, next, serial)
+            when {
+                mark != null -> { rows += MarkRow(name.joinToString(" "), mark); name.clear() }
+                NAME_WORD.matches(token) -> name += token
+                else -> name.clear()
+            }
+        }
+        return rows
+    }
+
+    private fun markOf(token: String, next: String?, serial: String?): String? {
+        val upper = token.uppercase()
+        val nextIsName = next != null && NAME_WORD.matches(next)
+        return when {
+            // A blank mark cell: the number after the name is the next table's serial (side-by-side rows share it).
+            SCORE.matches(token) -> token.takeUnless { it == serial && nextIsName }
+            upper in ABSENT -> token
+            token in NO_MARK -> "-"
+            upper in ABSENT_MISREAD && (next == null || SCORE.matches(next)) -> "AB"
+            else -> null
         }
     }
 }

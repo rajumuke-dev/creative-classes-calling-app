@@ -57,36 +57,58 @@ object MarksOcr {
                     rows.last() += line
                 }
             }
-            val column = marksColumn(lines, page.width)
+            val columns = marksColumns(rows)
             return rows.map { row ->
-                val text = row.sortedBy { it.second.left }.joinToString(" ") { it.first }
-                val inColumn = column?.let { c -> row.filter { c.overlaps(it.second) } }.orEmpty()
-                // Lone digits are sometimes dropped or misread as a letter (e.g. "9" as "o"); read those cells again.
-                val unreadable = column != null && inColumn.none { MARK_CELL.matches(it.first.trim().substringAfterLast(' ')) }
-                val recovered = if (unreadable) rereadCell(recognizer, page, column!!, row) else null
-                when {
-                    recovered == null -> text
-                    inColumn.isEmpty() -> "$text $recovered"
-                    else -> "${text.substringBeforeLast(' ')} $recovered"
+                val cells = row.sortedBy { it.second.left }.toMutableList()
+                for ((i, column) in columns.withIndex()) {
+                    // Only this table's cells: right of the previous table's marks column.
+                    val from = columns.getOrNull(i - 1)?.let { it.centre + it.halfWidth } ?: Float.NEGATIVE_INFINITY
+                    val table = cells.filter { it.second.exactCenterX() > from && it.second.left < column.centre + column.halfWidth }
+                    val inColumn = table.filter { column.overlaps(it.second) }
+                    if (table.none { isName(it.first) }) continue
+                    // Lone digits are sometimes dropped or misread as a letter (e.g. "9" as "o"); read those cells again.
+                    if (inColumn.any { MARK_CELL.matches(it.first.trim().substringAfterLast(' ')) }) continue
+                    val recovered = rereadCell(recognizer, page, column, row) ?: continue
+                    val last = inColumn.lastOrNull()
+                    if (last == null) {
+                        cells += recovered to column.box(row.first().second)
+                    } else {
+                        cells[cells.indexOf(last)] = "${last.first.trim().substringBeforeLast(' ', "")} $recovered".trim() to last.second
+                    }
                 }
+                cells.sortedBy { it.second.left }.joinToString(" ") { it.first }
             }
         } finally {
             recognizer.close()
         }
     }
 
-    /** Horizontal band of the marks column, from the marks the full-page pass did read. Null if too few to be sure. */
-    private fun marksColumn(lines: List<Pair<String, Rect>>, width: Int): Column? {
-        val cells = lines.filter { MARK_CELL.matches(it.first.trim()) && it.second.left > width / 2 }.map { it.second }
-        if (cells.size < 3) return null
-        val centre = cells.map { it.exactCenterX() }.sorted()[cells.size / 2]
-        val height = cells.map { it.height() }.sorted()[cells.size / 2]
-        return Column(centre, height)
+    private fun isName(text: String) = text.count { it.isLetter() } >= 2 && !MARK_CELL.matches(text.trim())
+
+    /**
+     * One marks column per table, found from the cells read just after a name in each row (serials come before names).
+     * Positions are grouped by gaps wider than a few cell heights; groups seen in too few rows are noise. Empty if unsure.
+     */
+    private fun marksColumns(rows: List<List<Pair<String, Rect>>>): List<Column> {
+        val marks = rows.flatMap { row ->
+            row.sortedBy { it.second.left }.zipWithNext()
+                .filter { (a, b) -> isName(a.first) && MARK_CELL.matches(b.first.trim()) }
+                .map { it.second.second }
+        }
+        if (marks.size < 3) return emptyList()
+        val height = marks.map { it.height() }.sorted()[marks.size / 2]
+        val groups = mutableListOf<MutableList<Rect>>()
+        for (r in marks.sortedBy { it.exactCenterX() }) {
+            if (groups.isEmpty() || r.exactCenterX() - groups.last().last().exactCenterX() > height * 3) groups += mutableListOf(r) else groups.last() += r
+        }
+        val minimum = maxOf(3, groups.maxOf { it.size } / 4)
+        return groups.filter { it.size >= minimum }.map { g -> Column(g.map { it.exactCenterX() }.sorted()[g.size / 2], height) }
     }
 
     private class Column(val centre: Float, val height: Int) {
         val halfWidth get() = height * 1.8f
         fun overlaps(r: Rect) = r.right > centre - halfWidth && r.left < centre + halfWidth
+        fun box(row: Rect) = Rect((centre - height).toInt(), row.top, (centre + height).toInt(), row.bottom)
     }
 
     /**

@@ -60,6 +60,43 @@ class MarksTest {
     }
 
     @Test
+    fun `three side by side tables with serials the OCR missed`() {
+        // Real OCR lines from a 3-batch CBSE marklist: lone serials (5, 8, 9) dropped, one stray serial at the end, AB read as AE.
+        val rows = MarkRowParser.parse(
+            listOf(
+                "10th CBSE Batch-1 Marklist 10th CBSE Batch-2 Marklist 10th CBSE Batch-3 Marklist",
+                "EXAM DATE-15 &18 Oct 26 EXAM DATE-15 & 18 Oct 26 EXAM DATE-15 & 18 Oct 26",
+                "SUBJECT - MATHS SUBJECT - MATHS SUBJECT - MATHS",
+                "Sr. NO. Name Of Students |Marks 80 Sr. NO. Name Of Students Marks 80 Sr. NO. Name Of Students Marks 80",
+                "5 Advait Pansare 40 Anjali More 17 5 Amey Mate 41",
+                "8 Arnav Jadhav AB Aryan Kadam AB 8 Anushka Itkar 27",
+                "9 Aryan Baviskar 33 Aryan Kokat 37 Bhakti Jadhav 33 9",
+                "19 Kartik Jagtap 18 19 Kaiwalya Jayale 10 19 Neel Gadhave AE",
+                "glaalglag8ls&ee&*2",
+                "38 Sarthak Nirmal 34 38 Swaraj R. Bhosle 17 38 Soham Jangam 28",
+                "55 Yashika Pathare 44",
+            ),
+        )
+        assertEquals(
+            listOf(
+                "Advait Pansare" to "40", "Anjali More" to "17", "Amey Mate" to "41",
+                "Arnav Jadhav" to "AB", "Aryan Kadam" to "AB", "Anushka Itkar" to "27",
+                "Aryan Baviskar" to "33", "Aryan Kokat" to "37", "Bhakti Jadhav" to "33",
+                "Kartik Jagtap" to "18", "Kaiwalya Jayale" to "10", "Neel Gadhave" to "AB",
+                "Sarthak Nirmal" to "34", "Swaraj R. Bhosle" to "17", "Soham Jangam" to "28",
+                "Yashika Pathare" to "44",
+            ),
+            rows.map { it.name to it.marks },
+        )
+    }
+
+    @Test
+    fun `a serial number is not taken as the mark of a student whose mark cell is blank`() {
+        val rows = MarkRowParser.parse(listOf("9th SSC Batch- 1 EXAMMarklist", "15 Omkar Thorat 15 Radha Age 41"))
+        assertEquals(listOf("Radha Age" to "41"), rows.map { it.name to it.marks })
+    }
+
+    @Test
     fun `matches exact reordered and closely spelled names`() {
         val students = listOf("Asha Verma", "Kumar Ravi", "Meenakshi Rao", "Omar Shah")
         val result = NameMatcher.match(
