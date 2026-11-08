@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableStateMapOf
@@ -137,6 +138,15 @@ fun CallingScreen(vm: CallingViewModel) {
             Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(8.dp).clip(CircleShape),
             trackColor = MaterialTheme.colorScheme.primaryContainer,
             strokeCap = StrokeCap.Round,
+        )
+        // Always-visible search bar (as in Gmail or Contacts); tapping it opens the full name search.
+        Text(
+            "\uD83D\uDD0D  " + if (vm.marksCalling) "Search students and marks image" else "Search students",
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh).clickable { vm.showNameSearch = true }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CallFilter.values().filter { vm.marksCalling || it !in MARKS_FILTERS }.forEach { f ->
@@ -364,6 +374,7 @@ fun CallingScreen(vm: CallingViewModel) {
         if (thenReport) vm.prepareReport()
     }
     if (showMarks) MarksDialog(vm) { showMarks = false }
+    if (vm.showNameSearch) NameSearchDialog(vm)
     vm.filterNotice?.let { notice ->
         AlertDialog(
             onDismissRequest = { vm.filterNotice = null },
@@ -490,7 +501,6 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
             dismissButton = { TextButton(onClick = { vm.showNameSearch = true }) { Text("Search names") } },
         )
     }
-    if (vm.showNameSearch) NameSearchDialog(vm)
 }
 
 /** Teacher name and when the teacher is available, told to parents who were not reached; saved with the session. */

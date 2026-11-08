@@ -73,13 +73,13 @@ mark; "Absent" lists AB. Lower than and Higher than each keep their own mark, so
 to Higher than in the same session for a second round; switching back restores the other mark. On By marks and Absent the
 top counter counts that list (e.g. "Lower than 20: 1 / 12"). Students without marks are summed up in a tap-to-open
 "not listed" line. OCR can misread digits, so review the marks; the import notice lists
-unmatched names and students left without marks. **Search names** (in the import notice and under Marks) finds a name,
+unmatched names and students left without marks. **Search names** (the always-visible 🔍 bar on the calling screen, the import notice and Marks) shows each student's Excel phone numbers and finds a name,
 or part of it, in both the student list and the rows read from the image (kept with the session), so a misspelt name
 can be told from a missing one; the student's mark can be typed right in the results. Search ignores word order and
 extra middle names, and also finds names that sound the same (Shrawani / Shravani, Zeeshan / Jishan) or have a small
 typo. Image rows that matched no student are marked "Not matched"; **Use** gives that row's mark to a student in the
 list (e.g. a misspelt name), or **Add as new student** (optional parent phone) adds them, so they join the Lower than /
-Higher than list being called. Marks are never added to the report.
+Higher than list being called. Marks are never added to the report. **Compare with marks image** shows the zoomable image (pinch, drag, double tap) above the full list, or beside it in landscape, to check names one by one.
 
 ## Build
 
