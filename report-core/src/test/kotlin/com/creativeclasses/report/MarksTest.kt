@@ -162,4 +162,19 @@ class MarksTest {
         assertFalse(NameMatcher.searchMatches("mundhe x", "Aaditi Mundhe"))
         assertFalse(NameMatcher.searchMatches("  ", "Aaditi Mundhe"))
     }
+
+    @Test
+    fun `name search finds middle names, spelling variants and small typos`() {
+        assertTrue(NameMatcher.searchMatches("arya mule", "Arya Rajesh Mule"))
+        assertTrue(NameMatcher.searchMatches("mule arya", "Mule Arya Rajesh"))
+        assertTrue(NameMatcher.searchMatches("shrawani", "Shravani Thorat"))
+        assertTrue(NameMatcher.searchMatches("aditi", "Aaditi Mundhe"))
+        assertTrue(NameMatcher.searchMatches("sachin", "Sacheen Pawar"))
+        assertTrue(NameMatcher.searchMatches("zeeshan", "Jishan Shaikh"))
+        assertTrue(NameMatcher.searchMatches("pallwad", "Adarsh Pallewad"))
+        assertTrue(NameMatcher.searchMatches("vaishanvi", "Vaishnavi Kale"))
+        assertFalse(NameMatcher.searchMatches("ravi", "Rahul Patil"))
+        assertFalse(NameMatcher.searchMatches("ram", "Rao Mundhe"))
+        assertFalse(NameMatcher.searchMatches("shinde", "Shivam Kedar"))
+    }
 }

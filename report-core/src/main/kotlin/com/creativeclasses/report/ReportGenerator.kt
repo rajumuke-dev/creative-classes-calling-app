@@ -56,7 +56,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         val willVisit = records.count { it.outcome == CallOutcome.WILL_VISIT }
         val callLater = records.count { it.outcome == CallOutcome.CALL_LATER }
         val noContact = records.count { it.noContact() }
-        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED } - noContact
+        val notCalled = records.count { it.isPending() && !it.noContact() }
         val concerns = records.count { it.hasConcern() }
         val followUps = records.count { it.needsFollowUp() }
         val status = statusOf(records)
@@ -94,11 +94,11 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
 
     private fun statusOf(records: List<CallRecord>): ReportStatus {
         val total = records.size
-        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED }
-        val unresolved = notCalled + records.count { it.outcome == CallOutcome.NO_ANSWER || it.outcome == CallOutcome.CALL_LATER }
+        // A student is done once a call result or a teacher remark is recorded; unreached parents stay as follow-ups.
+        val pending = records.count { it.isPending() }
         return when {
-            total == 0 || notCalled == total -> ReportStatus.NOT_STARTED
-            unresolved > 0 -> ReportStatus.PARTIALLY_COMPLETED
+            total == 0 || pending == total -> ReportStatus.NOT_STARTED
+            pending > 0 -> ReportStatus.PARTIALLY_COMPLETED
             records.any { it.hasConcern() } || records.any { it.needsFollowUp() } -> ReportStatus.COMPLETED
             else -> ReportStatus.COMPLETED_SUCCESSFULLY
         }
@@ -137,7 +137,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         ) else emptyList()
         val body = when {
             r.noContact() -> listOf("Contact number not found, so the parent could not be called.") + sentenceOrEmpty(remark)
-            r.outcome == CallOutcome.NOT_CALLED -> listOf("Call has not been made yet.") + sentenceOrEmpty(remark)
+            r.isPending() -> listOf("Call has not been made yet.")
             r.outcome == CallOutcome.NO_ANSWER -> listOf("Parent could not be reached.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.WILL_VISIT -> listOf("Parent will come to visit the class.") + sentenceOrEmpty(remark)
             r.outcome == CallOutcome.CALL_LATER -> listOf("Parent is to be called again later.") + sentenceOrEmpty(remark)
@@ -195,6 +195,7 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
     private fun CallRecord.hasConcern() = isContacted() && (outcome == CallOutcome.CONCERN_RAISED || concerns.isNotEmpty())
     private fun CallRecord.isQuiet() =
         outcome == CallOutcome.CONTACTED && !hasConcern() && !needsFollowUp() && cleanRemark(remark) == null
+    private fun CallRecord.isPending() = outcome == CallOutcome.NOT_CALLED && cleanRemark(remark) == null
     private fun CallRecord.displayName() = studentName.clean() ?: "Student (name not recorded)"
 
     private fun String?.clean(): String? = this?.trim()?.replace(WHITESPACE, " ")?.takeIf { it.isNotEmpty() }

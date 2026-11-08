@@ -74,7 +74,11 @@ top counter counts that list (e.g. "Lower than 20: 1 / 12"). Students without ma
 "not listed" line. OCR can misread digits, so review the marks; the import notice lists
 unmatched names and students left without marks. **Search names** (in the import notice and under Marks) finds a name,
 or part of it, in both the student list and the rows read from the image (kept with the session), so a misspelt name
-can be told from a missing one; the student's mark can be typed right in the results. Marks are never added to the report.
+can be told from a missing one; the student's mark can be typed right in the results. Search ignores word order and
+extra middle names, and also finds names that sound the same (Shrawani / Shravani, Zeeshan / Jishan) or have a small
+typo. Image rows that matched no student are marked "Not matched"; **Use** gives that row's mark to a student in the
+list (e.g. a misspelt name), or **Add as new student** (optional parent phone) adds them, so they join the Lower than /
+Higher than list being called. Marks are never added to the report.
 
 ## Build
 
@@ -94,4 +98,4 @@ Release builds are signed with the local debug key so they install over the exis
 proper release key before publishing to a store.
 
 The report covers only the students in the active filter. On By marks with both a Lower than and a Higher than list set,
-one report has a section (counts and feedback) for each list, with one overall status. Students with no valid phone number are listed as "Contact Not Found" follow-ups. Remarks can be dictated with Speak.
+one report has a section (counts and feedback) for each list, with one overall status. Students with no valid phone number are listed as "Contact Not Found" follow-ups. Remarks can be dictated with Speak. The overall status is "Completed" once every student has a call result (including Not Received or Call Later, which stay as follow-ups) or a remark; it is "Partially Completed" only while some students have neither.

@@ -63,18 +63,28 @@ class ReportGeneratorTest {
     }
 
     @Test
-    fun `partial completion never claims completion`() {
+    fun `every student called is completed even when some parents were not reached`() {
         val records = ok(21) + List(3) { CallRecord("NA $it", CallOutcome.NO_ANSWER) } +
             CallRecord("Later", CallOutcome.CALL_LATER)
         val report = generator.generate(session, records)
-        assertEquals(ReportStatus.PARTIALLY_COMPLETED, report.status)
-        assertContains(report.text, "Parent calling regarding the 8th CBSE examination results is in progress.")
+        assertEquals(ReportStatus.COMPLETED, report.status)
+        assertContains(report.text, "The parent calling activity regarding the 8th CBSE examination results has been completed.")
         assertContains(report.text, "Parents Contacted: 21")
         assertContains(report.text, "Call Not Received: 3")
         assertContains(report.text, "Call Later: 1")
         assertContains(report.text, "Follow-ups Required: 4")
         assertContains(report.text, "4 parents require follow-up.")
-        assertFalse(report.text.contains("completed"))
+        assertFalse(report.text.contains("Partially"))
+    }
+
+    @Test
+    fun `a remark without a call result counts as done`() {
+        val records = ok(2) + CallRecord("Asha Rao", CallOutcome.NOT_CALLED, remark = "Met parent at the class")
+        val report = generator.generate(session, records)
+        assertEquals(ReportStatus.COMPLETED_SUCCESSFULLY, report.status)
+        assertContains(report.text, "Asha Rao\nMet parent at the class.")
+        assertFalse(report.text.contains("Not Yet Called") || report.text.contains("not been made"))
+        assertEquals(ReportStatus.PARTIALLY_COMPLETED, generator.generate(session, ok(2) + CallRecord("Ravi", CallOutcome.NOT_CALLED)).status)
     }
 
     @Test
@@ -189,7 +199,7 @@ class ReportGeneratorTest {
         assertContains(text.substring(lowAt, highAt), "Call Not Received: 1")
         assertContains(text.substring(highAt), "1. Meera\nParent is happy.")
         assertEquals(1, Regex("Overall Status:").findAll(text).count())
-        assertContains(text, "Overall Status:\nPartially Completed")
+        assertContains(text, "Overall Status:\nCompleted\n1 parent requires follow-up.")
         assertEquals(generator.generate(session, low).text, generator.generateSections(session, listOf(ReportSection(null, low))).text)
     }
 }

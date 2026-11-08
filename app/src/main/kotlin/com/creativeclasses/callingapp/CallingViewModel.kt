@@ -141,7 +141,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     /** Name of the list being counted, e.g. "Lower than 20", or null for the whole class. */
     val listName: String?
         get() = when {
-            filter == CallFilter.BY_MARKS && marksReady -> "${marksRule.label} ${threshold.trim()}"
+            filter == CallFilter.BY_MARKS -> marksListName
             filter == CallFilter.ABSENT -> "Absent"
             else -> null
         }
@@ -152,6 +152,18 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         marks = marks.toMutableList().also { it[index] = text.take(8) }
         scheduleSave()
     }
+
+    /** Adds a student found on the marks image but missing from the contact sheet; returns their index. */
+    fun addStudent(name: String, phone: String, mark: String): Int {
+        students = students + ImportedStudent(name.trim(), phone.trim().takeIf { it.isNotEmpty() }, null)
+        records = records + CallRecord(name.trim(), CallOutcome.NOT_CALLED)
+        marks = marks + mark.take(8)
+        scheduleSave()
+        return students.lastIndex
+    }
+
+    /** E.g. "Lower than 20", or null while the current rule has no mark entered. */
+    val marksListName: String? get() = if (marksReady) "${marksRule.label} ${threshold.trim()}" else null
 
     fun updateTeacher(teacher: String, availability: String) {
         form = form.copy(teacher = teacher.trim(), availability = availability.trim())

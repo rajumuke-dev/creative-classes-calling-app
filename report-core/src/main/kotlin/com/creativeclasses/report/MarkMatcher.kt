@@ -61,12 +61,29 @@ object NameMatcher {
 
     private fun key(name: String) = words(name).joinToString(" ")
 
-    /** Search box match: every typed word appears in the name, ignoring case, spaces and punctuation ("pall" finds "Adarsh Pallewad"). */
+    /**
+     * Search box match: every typed word appears in the name, ignoring case, spaces, punctuation and word order
+     * ("pall" finds "Adarsh Pallewad"), so extra middle names never hide a student. A word also matches when it sounds
+     * the same ("Shrawani" / "Shravani", "Zeeshan" / "Jishan") or is one typo away (two for long words).
+     */
     fun searchMatches(query: String, name: String): Boolean {
         val typed = words(query)
-        val letters = words(name).joinToString("")
-        return typed.isNotEmpty() && typed.all { it in letters }
+        val nameWords = words(name)
+        val letters = nameWords.joinToString("")
+        val sounds = nameWords.joinToString("") { sound(it) }
+        return typed.isNotEmpty() && typed.all { w ->
+            w in letters || sound(w) in sounds || nameWords.any { typo(sound(w), sound(it)) }
+        }
     }
+
+    /** Common English spellings of the same Indian name sound, and doubled letters, written one way. */
+    private fun sound(word: String) = word
+        .replace('w', 'v').replace('z', 'j').replace('y', 'i')
+        .replace("ee", "i").replace("oo", "u").replace("ph", "f")
+        .replace(Regex("([bcdgkpst])h"), "$1")
+        .replace(Regex("(.)\\1+"), "$1")
+
+    private fun typo(typed: String, word: String) = typed.length >= 5 && distance(typed, word) <= if (typed.length >= 8) 2 else 1
 
     fun match(rows: List<MarkRow>, studentNames: List<String>): MarkMatchResult {
         val matched = mutableMapOf<Int, String>()
