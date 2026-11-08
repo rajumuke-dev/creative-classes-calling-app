@@ -11,8 +11,9 @@ Android app for teachers to call parents from an Excel list, record outcomes and
   follow-up; numbers that are not 10 digits are flagged invalid and can't be dialled) →
   **Share Report** → editable preview → **Share on WhatsApp** (`ACTION_SEND`, `text/plain`; falls back to the
   share sheet), or **Save for Later** to keep the previewed text with the session and share it later in one tap
-  from the dashboard (**Share Saved Report**). Recording or changing a call afterwards discards the saved report, so
-  an outdated report is never shared; press **Share Report** again for the latest. Nothing is ever sent automatically.
+  from the dashboard. Every dashboard card has **Share Report**: it shares the saved report, or else a fresh report
+  from the latest calls. Recording or changing a call afterwards discards the saved report, so an outdated report is
+  never shared. Nothing is ever sent automatically.
   **Share Excel** (report preview) and **Excel** (each dashboard card) share `<session name>.xlsx` through the share
   sheet (WhatsApp, Drive, Gmail, ...). It is rebuilt from the saved session on every tap, so it always has the latest
   calls: a "Calls" sheet with every student (marks, call status, concerns, remarks, follow-up, contacts) under a
@@ -59,7 +60,7 @@ every 15, 30, 45 or 60 minutes or switch reminders off (remembered; also under "
 The reminder never interrupts typing: it waits until you leave the text box. Time on parent calls counts as work; leaving the app for 30 minutes or closing it restarts
 the timer, and a reminder that falls due during a call appears when you return.
 
-**Marks** (one subject per session): on the setup screen you can upload the marks image and pick Lower than / Higher than plus a mark; calling then starts already filtered. The same controls are in the "By marks" filter. You can also type marks on
+**Marks** (one subject per session): marks are used only when the Calling Purpose (chosen first on the setup screen) is Exam Result or Performance; other purposes such as Parent Meeting hide the marks image, the Marks button, the By marks / Absent filters and the marks field. For a marks purpose you can upload the marks image on the setup screen; calling then opens on "By marks", where you pick Lower than / Higher than and the mark. Once uploaded, the Excel and the marks image show as cards (file name, sheet and student count; image thumbnail and rows read) with **Change**; tap the image card to view it full screen with pinch to zoom. A copy of the image is kept with the session (deleted with it), so the card is also under Marks after reopening. The image can also be uploaded from the Marks button while calling. You can also type marks on
 each card or use "Read marks from image" (on-device OCR, nothing is uploaded). Names are matched exactly, then
 by same words in any order, then by a unique close spelling, then by the only student whose name contains all the
 marklist name's words (e.g. surname only), then by the same letters ignoring spaces (e.g. "Harpreetsingh" =

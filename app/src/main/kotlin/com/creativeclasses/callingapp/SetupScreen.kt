@@ -4,12 +4,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.input.KeyboardType
-import com.creativeclasses.report.MarksRule
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
@@ -47,13 +43,12 @@ private const val XLSX_MIME = "application/vnd.openxmlformats-officedocument.spr
 fun SetupScreen(vm: CallingViewModel) {
     val context = LocalContext.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) vm.importFile { context.contentResolver.openInputStream(uri) }
+        if (uri != null) vm.importFile(displayName(context, uri)) { context.contentResolver.openInputStream(uri) }
     }
     val marksPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importMarksImage(uri)
     }
     val form = vm.form
-    var ruleMenu by remember { mutableStateOf(false) }
     var purposeMenu by remember { mutableStateOf(false) }
 
     Column(
@@ -65,52 +60,6 @@ fun SetupScreen(vm: CallingViewModel) {
             TextButton(onClick = vm::startCalling) { Text("Next \u2192") }
         }
         HeroHeader("Creative Classes", "Parent Calling")
-        Spacer(Modifier.height(16.dp))
-
-        Button(onClick = { picker.launch(arrayOf(XLSX_MIME)) }, Modifier.fillMaxWidth().tiltOnTouch(8f), elevation = raisedButton()) {
-            Text("Import Excel (.xlsx)")
-        }
-        vm.message?.let { Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
-        if (vm.sheetNames.size > 1) {
-            Text("Sheet", Modifier.padding(top = 8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                vm.sheetNames.forEachIndexed { i, name ->
-                    FilterChip(selected = vm.selectedSheet == i, onClick = { vm.selectSheet(i) }, label = { Text(name) })
-                }
-            }
-        }
-        if (vm.students.isNotEmpty()) {
-            Spacer(Modifier.height(16.dp))
-            Text("Filter by marks (optional)")
-            OutlinedButton(onClick = { marksPicker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
-                Text(if (vm.hasMarks) "Marks image uploaded - upload again" else "Upload marks image")
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    OutlinedButton(onClick = { ruleMenu = true }) { Text("${vm.marksRule.label} \u25BE") }
-                    DropdownMenu(expanded = ruleMenu, onDismissRequest = { ruleMenu = false }) {
-                        MarksRule.values().forEach { r ->
-                            DropdownMenuItem(text = { Text(r.label) }, onClick = {
-                                vm.updateMarksRule(r)
-                                ruleMenu = false
-                            })
-                        }
-                    }
-                }
-                OutlinedTextField(
-                    value = vm.threshold,
-                    onValueChange = vm::updateThreshold,
-                    label = { Text("Marks") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.holdsBreak().weight(1f).padding(start = 8.dp),
-                )
-            }
-            Text(
-                "Upload the marks image and enter the marks to start with only the matching students.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
         Spacer(Modifier.height(16.dp))
 
         Text("Calling Purpose")
@@ -126,6 +75,40 @@ fun SetupScreen(vm: CallingViewModel) {
         if (form.purpose == CallingPurpose.OTHER) {
             Field("Custom Purpose", form.customPurpose) { vm.form = form.copy(customPurpose = it) }
         }
+        Spacer(Modifier.height(16.dp))
+
+        if (vm.sheetNames.isNotEmpty()) {
+            ExcelUploadCard(vm) { picker.launch(arrayOf(XLSX_MIME)) }
+        } else {
+            Button(onClick = { picker.launch(arrayOf(XLSX_MIME)) }, Modifier.fillMaxWidth().tiltOnTouch(8f), elevation = raisedButton()) {
+                Text("Import Excel (.xlsx)")
+            }
+        }
+        vm.message?.let { Text(it, Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.primary) }
+        if (vm.sheetNames.size > 1) {
+            Text("Sheet", Modifier.padding(top = 8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                vm.sheetNames.forEachIndexed { i, name ->
+                    FilterChip(selected = vm.selectedSheet == i, onClick = { vm.selectSheet(i) }, label = { Text(name) })
+                }
+            }
+        }
+        if (vm.students.isNotEmpty() && vm.marksCalling) {
+            Spacer(Modifier.height(16.dp))
+            Text("Marks image (optional)")
+            if (vm.marksImageFile() != null) {
+                MarksImageCard(vm) { marksPicker.launch(arrayOf("image/*")) }
+            } else {
+                OutlinedButton(onClick = { marksPicker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
+                    Text(if (vm.hasMarks) "Marks image uploaded - upload again" else "Upload marks image")
+                }
+            }
+            Text(
+                "After starting, choose Lower than or Higher than and the marks to call only those students.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Spacer(Modifier.height(8.dp))
         Field("Session Name", form.sessionName) { vm.form = form.copy(sessionName = it) }
         Field("Class (e.g. 8th)", form.className) { vm.form = form.copy(className = it) }
         Field("Section", form.section) { vm.form = form.copy(section = it) }
@@ -166,3 +149,10 @@ private fun Field(label: String, value: String, onChange: (String) -> Unit) {
         modifier = Modifier.holdsBreak().fillMaxWidth().padding(top = 8.dp),
     )
 }
+
+/** File name the picker shows for [uri], e.g. "10th ssc.xlsx". */
+private fun displayName(context: android.content.Context, uri: android.net.Uri): String? =
+    runCatching {
+        context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+    }.getOrNull()

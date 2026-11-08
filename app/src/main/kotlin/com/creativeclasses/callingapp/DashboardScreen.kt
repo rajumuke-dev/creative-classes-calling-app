@@ -73,7 +73,7 @@ fun DashboardScreen(vm: CallingViewModel) {
                         Modifier.animateItem().enter3D(80 * i.coerceAtMost(6)).tiltOnTouch(),
                         onOpen = { vm.openSession(session) },
                         onDelete = { pendingDelete = session },
-                        onShare = session.savedReport?.let { report -> { shareReport(context, report) } },
+                        onShare = { vm.reportFor(session)?.let { shareReport(context, it) } },
                         onShareExcel = { shareExcel(context) { vm.exportExcel(session) } },
                     )
                 }
@@ -117,7 +117,7 @@ private fun SessionCard(
     modifier: Modifier,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
-    onShare: (() -> Unit)?,
+    onShare: () -> Unit,
     onShareExcel: () -> Unit,
 ) {
     val p = SessionProgress.of(session.records)
@@ -178,14 +178,14 @@ private fun SessionCard(
                     color = MaterialTheme.colorScheme.tertiary,
                 )
             }
-            if (onShare != null) {
-                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("\uD83D\uDCC4 Report saved", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    OutlinedButton(onClick = onShare) { Text("Share Saved Report") }
-                }
+            if (session.savedReport != null) {
+                Text("\uD83D\uDCC4 Report saved", Modifier.padding(top = 10.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onOpen, Modifier.weight(1f), elevation = raisedButton()) { Text(if (p.resumeIndex == null) "Open" else "Continue calling") }
+            Button(onClick = onOpen, Modifier.fillMaxWidth().padding(top = 10.dp), elevation = raisedButton()) {
+                Text(if (p.resumeIndex == null) "Open" else "Continue calling")
+            }
+            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onShare, Modifier.weight(1f)) { Text("Share Report") }
                 OutlinedButton(onClick = onShareExcel) { Text("Excel") }
                 OutlinedButton(onClick = onDelete) { Text("Delete") }
             }

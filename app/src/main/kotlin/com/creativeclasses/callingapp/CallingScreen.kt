@@ -129,7 +129,7 @@ fun CallingScreen(vm: CallingViewModel) {
         Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = vm::goToDashboard) { Text("\u2190 Back") }
             AnimatedCount("${vm.listName?.let { "$it:" } ?: "Called"} ${progress.attempted} / ${progress.total}", Modifier.weight(1f))
-            TextButton(onClick = { showMarks = true }) { Text("Marks") }
+            if (vm.marksCalling) TextButton(onClick = { showMarks = true }) { Text("Marks") }
             TextButton(onClick = openReport) { Text("Next \u2192") }
         }
         LinearProgressIndicator(
@@ -139,7 +139,7 @@ fun CallingScreen(vm: CallingViewModel) {
             strokeCap = StrokeCap.Round,
         )
         FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CallFilter.values().forEach { f ->
+            CallFilter.values().filter { vm.marksCalling || it !in MARKS_FILTERS }.forEach { f ->
                 FilterChip(selected = vm.filter == f, onClick = { vm.filter = f }, label = { Text(f.label) })
             }
         }
@@ -234,7 +234,7 @@ fun CallingScreen(vm: CallingViewModel) {
                                 ContactRow(context, "Contact 1", student.contact1)
                                 ContactRow(context, "Contact 2", student.contact2)
                             }
-                            OutlinedTextField(
+                            if (vm.marksCalling) OutlinedTextField(
                                 value = vm.marks.getOrElse(i) { "" },
                                 onValueChange = { vm.setMark(i, it) },
                                 label = { Text("Marks") },
@@ -462,8 +462,12 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
         title = { Text("Marks") },
         text = {
             Column {
-                OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
-                    Text("Read marks from image")
+                if (vm.marksImageFile() != null) {
+                    MarksImageCard(vm) { picker.launch(arrayOf("image/*")) }
+                } else {
+                    OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
+                        Text("Read marks from image")
+                    }
                 }
                 OutlinedButton(onClick = { vm.showNameSearch = true }, Modifier.fillMaxWidth()) {
                     Text("Search names (list and image)")

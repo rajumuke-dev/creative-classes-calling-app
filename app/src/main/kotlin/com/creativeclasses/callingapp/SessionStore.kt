@@ -32,6 +32,11 @@ data class SavedSession(
     val otherThreshold: String = "",
     /** Name/marks rows read from the last marks image, kept so names can be searched there later. */
     val imageRows: List<MarkRow> = emptyList(),
+    /** Name of the imported Excel file and the sheet the students came from, shown so the upload is visible. */
+    val excelFile: String = "",
+    val excelSheet: String = "",
+    /** File name of the copy of the last marks image in [SessionStore.image]; blank when none was kept. */
+    val marksImage: String = "",
 ) {
     val title: String
         get() = form.sessionName.ifBlank {
@@ -43,6 +48,12 @@ data class SavedSession(
 /** One JSON file per session in the app's private storage, written atomically. */
 class SessionStore(context: Context) {
     private val dir = File(context.filesDir, "sessions").apply { mkdirs() }
+    private val images = File(context.filesDir, "marks-images").apply { mkdirs() }
+
+    /** A kept marks image; only the last path part of [name] is used, so a stored name cannot point elsewhere. */
+    fun image(name: String) = File(images, File(name).name)
+
+    fun newImageName() = "${java.util.UUID.randomUUID()}.jpg"
 
     /** Most recently updated first. */
     fun list(): List<SavedSession> =
@@ -62,6 +73,8 @@ class SessionStore(context: Context) {
     }
 
     fun delete(id: String) {
+        runCatching { JSONObject(file(id).readText()).optString("marksImage") }.getOrNull()
+            ?.takeIf { it.isNotBlank() }?.let { image(it).delete() }
         file(id).delete()
     }
 
@@ -107,6 +120,9 @@ class SessionStore(context: Context) {
         put("filter", s.filter.name)
         put("otherThreshold", s.otherThreshold)
         put("imageRows", JSONArray(s.imageRows.map { JSONObject().put("name", it.name).put("marks", it.marks) }))
+        put("excelFile", s.excelFile)
+        put("excelSheet", s.excelSheet)
+        put("marksImage", s.marksImage)
     }
 
     private fun decode(o: JSONObject): SavedSession {
@@ -156,6 +172,9 @@ class SessionStore(context: Context) {
             filter = if (legacy) legacyFilter else CallFilter.values().firstOrNull { it.name == o.optString("filter") } ?: CallFilter.ALL,
             otherThreshold = o.optString("otherThreshold"),
             imageRows = o.optJSONArray("imageRows")?.objects()?.map { MarkRow(it.getString("name"), it.getString("marks")) }.orEmpty(),
+            excelFile = o.optString("excelFile"),
+            excelSheet = o.optString("excelSheet"),
+            marksImage = o.optString("marksImage"),
         )
     }
 

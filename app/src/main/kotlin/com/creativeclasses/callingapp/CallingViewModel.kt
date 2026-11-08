@@ -42,6 +42,9 @@ enum class CallFilter(val label: String) {
     ALL("All"), NOT_CALLED("Not called"), FOLLOW_UP("Follow-up"), BY_MARKS("By marks"), ABSENT("Absent")
 }
 
+/** Filters that only make sense when calling about marks. */
+val MARKS_FILTERS = setOf(CallFilter.BY_MARKS, CallFilter.ABSENT)
+
 private fun thresholdOf(text: String) = text.trim().toDoubleOrNull()?.takeIf { it.isFinite() }
 
 /** Students shown for [filter], in calling order. Low marks are listed lowest score first so the weakest students are called first. */
@@ -107,6 +110,10 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     var marksNotice by mutableStateOf<String?>(null)
     var imageRows by mutableStateOf<List<MarkRow>>(emptyList())
     var showNameSearch by mutableStateOf(false)
+    /** Shown on the upload cards so the teacher can see what was already uploaded. */
+    var excelFile by mutableStateOf("")
+    var excelSheet by mutableStateOf("")
+    var marksImage by mutableStateOf("")
     var filterNotice by mutableStateOf<String?>(null)
     var reportScope by mutableStateOf<String?>(null)
     var form by mutableStateOf(SessionForm())
@@ -129,6 +136,9 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     val studentsWithoutMarks get() = students.indices.filter { marks.getOrNull(it).isNullOrBlank() }.map { students[it].name }
 
     val marksReady get() = thresholdValue != null
+
+    /** Marks matter only for result and performance calling; other purposes hide the marks filters and fields. */
+    val marksCalling get() = form.purpose == CallingPurpose.EXAM_RESULT || form.purpose == CallingPurpose.PERFORMANCE
 
     /** Every student in the list being worked through has an outcome: the marks/absent selection when that filter is on, otherwise the whole class. */
     val listDone: Boolean
@@ -187,6 +197,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             marksNotice = try {
                 val lines = withContext(Dispatchers.IO) { MarksOcr.readRows(getApplication(), uri) }
+                keepImage(uri)
                 val rows = MarkRowParser.parse(lines)
                 val result = NameMatcher.match(rows, students.map { it.name })
                 marks = marks.toMutableList().also { m -> result.matched.forEach { (i, v) -> m[i] = v } }
@@ -211,11 +222,31 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Copies the marks image into private storage so its card and viewer still work after the app is reopened. */
+    private suspend fun keepImage(uri: Uri) {
+        val name = withContext(Dispatchers.IO) {
+            runCatching {
+                val name = store.newImageName()
+                getApplication<Application>().contentResolver.openInputStream(uri)!!.use { input ->
+                    store.image(name).outputStream().use { input.copyTo(it) }
+                }
+                name
+            }.getOrNull()
+        } ?: return
+        val old = marksImage
+        marksImage = name
+        if (old.isNotBlank()) withContext(Dispatchers.IO) { store.image(old).delete() }
+    }
+
+    fun marksImageFile(): File? = marksImage.takeIf { it.isNotBlank() }?.let { store.image(it) }?.takeIf { it.exists() }
+
     fun refreshSessions() {
         viewModelScope.launch { sessions = withContext(Dispatchers.IO) { store.list() } }
     }
 
     fun newSession() {
+        // An image kept during a setup that was never started belongs to no saved session.
+        if (currentId == null && marksImage.isNotBlank()) store.image(marksImage).delete()
         currentId = null
         workbook = null
         sheetNames = emptyList()
@@ -226,6 +257,9 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         threshold = ""
         otherThreshold = ""
         imageRows = emptyList()
+        excelFile = ""
+        excelSheet = ""
+        marksImage = ""
         marksRule = MarksRule.BELOW
         savedReport = null
         // Teacher details rarely change, so they carry over from the most recent session.
@@ -246,8 +280,11 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         marksRule = session.marksRule
         otherThreshold = session.otherThreshold
         imageRows = session.imageRows
+        excelFile = session.excelFile
+        excelSheet = session.excelSheet
+        marksImage = session.marksImage
         savedReport = session.savedReport
-        filter = session.filter
+        filter = if (!marksCalling && session.filter in MARKS_FILTERS) CallFilter.ALL else session.filter
         // Position in the visible (possibly filtered) list, as that is what the calling screen scrolls.
         resumeIndex = visibleIndices.indexOfFirst { records[it].outcome == CallOutcome.NOT_CALLED }.coerceAtLeast(0)
         screen = Screen.CALLING
@@ -285,7 +322,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         store.save(snapshot(id))
     }
 
-    private fun snapshot(id: String) = SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport, filter, otherThreshold, imageRows)
+    private fun snapshot(id: String) = SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport, filter, otherThreshold, imageRows,
+        excelFile, excelSheet, marksImage)
 
     /** Saves first, then exports the open session with the report text being previewed. */
     fun exportCurrentExcel(): File {
@@ -303,10 +341,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         val rows = session.records.mapIndexed { i, record ->
             SheetRow(session.students.getOrNull(i) ?: ImportedStudent(record.studentName, null, null), record, session.marks.getOrNull(i))
         }
-        val report = reportText ?: session.savedReport ?: generateReport(
-            session,
-            if (session.filter == CallFilter.BY_MARKS) CallFilter.BY_MARKS else CallFilter.ALL,
-        )?.first ?: generateReport(session, CallFilter.ALL)?.first
+        val report = reportText ?: reportFor(session)
         val lists = session.marksLists().filter { it.second.isNotEmpty() }.associate { (name, list) -> name to list.map { rows[it] } }
         // Only the latest export is kept; it is rebuilt on every share.
         val dir = File(getApplication<Application>().cacheDir, "exports").apply { deleteRecursively(); mkdirs() }
@@ -314,6 +349,15 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
             file.outputStream().use { SessionWorkbook.write(it, calling.copy(sessionName = session.title), session.form.subject, rows, report, lists) }
         }
     }
+
+    /**
+     * The session's saved report, else a fresh one from its latest calls (every marks list when the session is on
+     * By marks, otherwise the whole class), so the dashboard can always share an up-to-date report.
+     */
+    fun reportFor(session: SavedSession): String? = session.savedReport ?: generateReport(
+        session,
+        if (session.filter == CallFilter.BY_MARKS) CallFilter.BY_MARKS else CallFilter.ALL,
+    )?.first ?: generateReport(session, CallFilter.ALL)?.first
 
     private fun callingSession(form: SessionForm, date: LocalDate) = CallingSession(
         sessionName = form.sessionName,
@@ -335,13 +379,15 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun importFile(open: () -> InputStream?) {
+    fun importFile(fileName: String?, open: () -> InputStream?) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val stream = open() ?: throw IllegalArgumentException("Could not open the selected file.")
                 val wb = stream.use { XlsxReader.open(it) }
                 workbook = wb
                 sheetNames = wb.sheetNames.map { it.trim() }
+                excelFile = fileName.orEmpty()
+                excelSheet = ""
                 selectedSheet = null
                 students = emptyList()
                 records = emptyList()
@@ -368,7 +414,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
             val info = StudentImporter.parseSheetName(wb.sheetNames[index])
             students = list
             records = list.map { CallRecord(it.name, CallOutcome.NOT_CALLED) }
-            marks = List(list.size) { "" }
+            marks = NameMatcher.match(imageRows, list.map { it.name }).matched.let { m -> List(list.size) { m[it].orEmpty() } }
+            excelSheet = sheetNames[index]
             form = form.copy(className = info.className.orEmpty(), board = info.board.orEmpty())
             message = "${list.size} students loaded from '${sheetNames[index]}'."
         } catch (e: IllegalArgumentException) {
@@ -388,7 +435,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (message == null) {
             if (currentId == null) currentId = UUID.randomUUID().toString()
-            filter = if (hasMarks && marksReady) CallFilter.BY_MARKS else CallFilter.ALL
+            // Lower than / Higher than is chosen on the calling screen, so a marks session opens on that filter.
+            filter = if (marksCalling && hasMarks) CallFilter.BY_MARKS else CallFilter.ALL
             resumeIndex = 0
             saveNow()
             screen = Screen.CALLING
