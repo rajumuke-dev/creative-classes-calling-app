@@ -21,6 +21,7 @@ object SessionWorkbook {
     private const val FONT = "Arial"
     private val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)
     private val UNSAFE_FILE_CHARS = Regex("[\\\\/:*?\"<>|\\p{Cntrl}]")
+    private val UNSAFE_SHEET_CHARS = Regex("[\\\\/:*?\\[\\]\\p{Cntrl}]")
     private val INVALID_XML = Regex("[^\\t\\n\\r\\x{20}-\\x{D7FF}\\x{E000}-\\x{FFFD}\\x{10000}-\\x{10FFFF}]")
     private val LABEL_LINE = Regex("^([A-Za-z][A-Za-z &/()-]{1,30}): (.+)$")
     private val NUMBERED_LINE = Regex("^\\d+\\.\\s.*")
@@ -68,17 +69,25 @@ object SessionWorkbook {
         sessionName.replace(UNSAFE_FILE_CHARS, " ").replace(Regex("\\s+"), " ").trim().trim('.').take(80)
             .ifEmpty { "Calling Session" } + ".xlsx"
 
-    fun write(out: OutputStream, session: CallingSession, subject: String?, rows: List<SheetRow>, reportText: String?) {
+    /** [lists] adds one table sheet per marks list (e.g. "Lower than 20"), after "Calls" and before "Report". */
+    fun write(
+        out: OutputStream, session: CallingSession, subject: String?, rows: List<SheetRow>, reportText: String?,
+        lists: Map<String, List<SheetRow>> = emptyMap(),
+    ) {
         val report = reportText?.lines()?.map { it.trim() }?.takeIf { lines -> lines.any { it.isNotEmpty() } }.orEmpty()
-        val sheets = listOfNotNull("Calls", "Report".takeIf { report.isNotEmpty() })
+        val tables = listOf("Calls" to rows) + lists.map { (name, list) -> name.replace(UNSAFE_SHEET_CHARS, " ").trim().take(31) to list }
+        val sheets = tables.map { it.first } + listOfNotNull("Report".takeIf { report.isNotEmpty() })
+        val name = session.sessionName.trim().ifEmpty { "Calling Session" }
         ZipOutputStream(out).apply {
             entry("[Content_Types].xml", contentTypes(sheets.size))
             entry("_rels/.rels", ROOT_RELS)
-            entry("xl/workbook.xml", workbook(sheets, callsColumns(rows).size, rows.size))
+            entry("xl/workbook.xml", workbook(sheets, tables.map { callsColumns(it.second).size to it.second.size }))
             entry("xl/_rels/workbook.xml.rels", workbookRels(sheets.size))
             entry("xl/styles.xml", STYLES)
-            entry("xl/worksheets/sheet1.xml", callsSheet(session, subject, rows))
-            if (report.isNotEmpty()) entry("xl/worksheets/sheet2.xml", reportSheet(session, report))
+            tables.forEachIndexed { i, (sheet, list) ->
+                entry("xl/worksheets/sheet${i + 1}.xml", callsSheet(session, subject, list, if (i == 0) name else "$name \u2013 $sheet"))
+            }
+            if (report.isNotEmpty()) entry("xl/worksheets/sheet${sheets.size}.xml", reportSheet(session, report))
             finish()
         }
     }
@@ -117,11 +126,10 @@ object SessionWorkbook {
         runs = listOf(Run("$ORGANISATION     ", 10, "C7D2FE", bold = true), Run(text, 18, "FFFFFF", bold = true)),
     )
 
-    private fun callsSheet(session: CallingSession, subject: String?, rows: List<SheetRow>): String {
+    private fun callsSheet(session: CallingSession, subject: String?, rows: List<SheetRow>, name: String): String {
         val columns = callsColumns(rows)
         val last = colName(columns.size - 1)
         val lastRow = HEADER_ROW + rows.size
-        val name = session.sessionName.trim().ifEmpty { "Calling Session" }
         val p = SessionProgress.of(rows.map { it.record })
         val details = listOf(
             listOfNotNull(session.className, session.section, session.board).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" "),
@@ -267,16 +275,20 @@ object SessionWorkbook {
             "<Override PartName=\"/xl/worksheets/sheet$it.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>"
         } + "</Types>"
 
-    private fun workbook(sheets: List<String>, columns: Int, rows: Int): String {
-        val last = colName(columns - 1)
+    /** [tables] holds (columns, rows) of each table sheet, which come first in [sheets]. */
+    private fun workbook(sheets: List<String>, tables: List<Pair<Int, Int>>): String {
         val names = buildString {
             append("<definedNames>")
-            if (rows > 0) append("<definedName name=\"_xlnm._FilterDatabase\" localSheetId=\"0\" hidden=\"1\">Calls!\$A\$$HEADER_ROW:\$$last\$${HEADER_ROW + rows}</definedName>")
-            append("<definedName name=\"_xlnm.Print_Titles\" localSheetId=\"0\">Calls!\$$HEADER_ROW:\$$HEADER_ROW</definedName>")
+            tables.forEachIndexed { i, (columns, rows) ->
+                val last = colName(columns - 1)
+                val sheet = "'${sheets[i].replace("'", "''")}'"
+                if (rows > 0) append("<definedName name=\"_xlnm._FilterDatabase\" localSheetId=\"$i\" hidden=\"1\">${esc(sheet)}!\$A\$$HEADER_ROW:\$$last\$${HEADER_ROW + rows}</definedName>")
+                append("<definedName name=\"_xlnm.Print_Titles\" localSheetId=\"$i\">${esc(sheet)}!\$$HEADER_ROW:\$$HEADER_ROW</definedName>")
+            }
             append("</definedNames>")
         }
         return XML_HEAD + "<workbook xmlns=\"$NS\" xmlns:r=\"$NS_R\"><sheets>" +
-            sheets.mapIndexed { i, s -> "<sheet name=\"$s\" sheetId=\"${i + 1}\" r:id=\"rId${i + 1}\"/>" }.joinToString("") +
+            sheets.mapIndexed { i, s -> "<sheet name=\"${esc(s)}\" sheetId=\"${i + 1}\" r:id=\"rId${i + 1}\"/>" }.joinToString("") +
             "</sheets>$names</workbook>"
     }
 

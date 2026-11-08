@@ -150,8 +150,10 @@ fun SetupScreen(vm: CallingViewModel) {
             title = { Text("Marks from image") },
             text = { Text(notice, Modifier.verticalScroll(rememberScrollState())) },
             confirmButton = { TextButton(onClick = { vm.marksNotice = null }) { Text("OK") } },
+            dismissButton = { TextButton(onClick = { vm.showNameSearch = true }) { Text("Search names") } },
         )
     }
+    if (vm.showNameSearch) NameSearchDialog(vm)
 }
 
 @Composable

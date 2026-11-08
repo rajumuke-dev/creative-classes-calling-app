@@ -91,6 +91,21 @@ class SessionWorkbookTest {
     }
 
     @Test
+    fun `each marks list gets its own table sheet between calls and report`() {
+        val data = ByteArrayOutputStream().also {
+            SessionWorkbook.write(it, session, "History", rows, "Report.", linkedMapOf("Lower than 20" to rows.take(1), "Higher than 80" to emptyList()))
+        }.toByteArray()
+        val book = XlsxReader.open(ByteArrayInputStream(data))
+        assertEquals(listOf("Calls", "Lower than 20", "Higher than 80", "Report"), book.sheetNames)
+        val low = book.rows(1)
+        assertEquals("CREATIVE CLASSES     10th SSC Unit Test \u2013 Lower than 20", low[0][0])
+        assertEquals(listOf("1", "Asha Rao", "19"), low[5].take(3))
+        assertEquals(6, low.size)
+        assertTrue("localSheetId=\"1\" hidden=\"1\">'Lower than 20'!\$A\$5:" in entry(data, "xl/workbook.xml"))
+        assertEquals("Report.", book.rows(3).last()[0])
+    }
+
+    @Test
     fun `file name is the session name made safe`() {
         assertEquals("10th SSC Unit Test.xlsx", SessionWorkbook.fileName(" 10th  SSC Unit Test "))
         assertEquals("Class 8 A B Marks.xlsx", SessionWorkbook.fileName("Class 8 A/B: Marks?"))

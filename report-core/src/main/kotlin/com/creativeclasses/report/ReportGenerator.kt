@@ -6,18 +6,14 @@ import java.util.Locale
 /** Pure, deterministic report builder. Uses only session data, call outcomes, concern selections and teacher remarks. */
 class ReportGenerator(private val organisation: String = "Creative Classes") {
 
-    fun generate(session: CallingSession, records: List<CallRecord>): ProfessionalReport {
-        val total = records.size
-        val contacted = records.count { it.isContacted() }
-        val noAnswer = records.count { it.outcome == CallOutcome.NO_ANSWER }
-        val willVisit = records.count { it.outcome == CallOutcome.WILL_VISIT }
-        val callLater = records.count { it.outcome == CallOutcome.CALL_LATER }
-        val noContact = records.count { it.noContact() }
-        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED } - noContact
-        val concerns = records.count { it.hasConcern() }
-        val followUps = records.count { it.needsFollowUp() }
-        val unresolved = noAnswer + callLater + notCalled + noContact
-        val status = statusOf(total, notCalled + noContact, unresolved, concerns, followUps)
+    fun generate(session: CallingSession, records: List<CallRecord>): ProfessionalReport =
+        generateSections(session, listOf(ReportSection(null, records)))
+
+    /** One report with counts and feedback per section (e.g. the Lower than and Higher than marks lists); a null title adds no heading. */
+    fun generateSections(session: CallingSession, sections: List<ReportSection>): ProfessionalReport {
+        val all = sections.flatMap { it.records }
+        val status = statusOf(all)
+        val followUps = all.count { it.needsFollowUp() }
         val subject = subjectOf(session)
 
         val out = StringBuilder()
@@ -32,7 +28,38 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         purposeLabel(session)?.let { out.appendLine("Purpose: $it") }
         out.appendLine()
         out.appendLine(intro(status, subject))
+        sections.forEach { section ->
+            out.appendLine()
+            section.title?.let {
+                out.appendLine("$it (${count(section.records.size, "student", "students")}):")
+                out.appendLine()
+            }
+            appendSection(out, subject, section.records)
+        }
+
         out.appendLine()
+        out.appendLine("Overall Status:")
+        out.appendLine(status.label)
+        if (followUps > 0) {
+            out.appendLine(count(followUps, "parent requires", "parents require") + " follow-up.")
+        }
+        out.appendLine()
+        out.appendLine("Prepared by:")
+        out.append(session.teacher.clean()?.let { "$it, $organisation" } ?: organisation)
+        return ProfessionalReport(out.toString(), status)
+    }
+
+    private fun appendSection(out: StringBuilder, subject: String, records: List<CallRecord>) {
+        val total = records.size
+        val contacted = records.count { it.isContacted() }
+        val noAnswer = records.count { it.outcome == CallOutcome.NO_ANSWER }
+        val willVisit = records.count { it.outcome == CallOutcome.WILL_VISIT }
+        val callLater = records.count { it.outcome == CallOutcome.CALL_LATER }
+        val noContact = records.count { it.noContact() }
+        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED } - noContact
+        val concerns = records.count { it.hasConcern() }
+        val followUps = records.count { it.needsFollowUp() }
+        val status = statusOf(records)
 
         out.appendLine("Total Parents: $total")
         out.appendLine("Parents Contacted: $contacted")
@@ -63,24 +90,18 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
                 out.appendLine("The remaining ${count(quiet, "parent was", "parents were")} contacted and informed, with no concerns raised.")
             }
         }
-
-        out.appendLine()
-        out.appendLine("Overall Status:")
-        out.appendLine(status.label)
-        if (followUps > 0) {
-            out.appendLine(count(followUps, "parent requires", "parents require") + " follow-up.")
-        }
-        out.appendLine()
-        out.appendLine("Prepared by:")
-        out.append(session.teacher.clean()?.let { "$it, $organisation" } ?: organisation)
-        return ProfessionalReport(out.toString(), status)
     }
 
-    private fun statusOf(total: Int, notCalled: Int, unresolved: Int, concerns: Int, followUps: Int) = when {
-        total == 0 || notCalled == total -> ReportStatus.NOT_STARTED
-        unresolved > 0 -> ReportStatus.PARTIALLY_COMPLETED
-        concerns > 0 || followUps > 0 -> ReportStatus.COMPLETED
-        else -> ReportStatus.COMPLETED_SUCCESSFULLY
+    private fun statusOf(records: List<CallRecord>): ReportStatus {
+        val total = records.size
+        val notCalled = records.count { it.outcome == CallOutcome.NOT_CALLED }
+        val unresolved = notCalled + records.count { it.outcome == CallOutcome.NO_ANSWER || it.outcome == CallOutcome.CALL_LATER }
+        return when {
+            total == 0 || notCalled == total -> ReportStatus.NOT_STARTED
+            unresolved > 0 -> ReportStatus.PARTIALLY_COMPLETED
+            records.any { it.hasConcern() } || records.any { it.needsFollowUp() } -> ReportStatus.COMPLETED
+            else -> ReportStatus.COMPLETED_SUCCESSFULLY
+        }
     }
 
     private fun intro(status: ReportStatus, subject: String) = when (status) {
@@ -102,9 +123,6 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         if (concerns == 0 && contacted > 0) lines += "No concerns were raised by the parents contacted."
         if (unreached > 0) lines += "Follow-up calls are required for the parents who could not be reached."
         if (notCalled > 0) lines += "${count(notCalled, "call is", "calls are")} yet to be made."
-        if (noContact > 0) {
-            lines += "${count(noContact, "parent", "parents")} could not be called as no valid contact number was found."
-        }
         if (noContact > 0) {
             lines += "${count(noContact, "parent", "parents")} could not be called as no valid contact number was found."
         }

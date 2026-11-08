@@ -31,10 +31,8 @@ object MarkRowParser {
     private fun entries(tokens: List<String>): List<MarkRow> {
         val rows = mutableListOf<MarkRow>()
         val name = mutableListOf<String>()
-        val serial = tokens.firstOrNull()?.takeIf { SCORE.matches(it) }
         tokens.forEachIndexed { i, token ->
-            val next = tokens.getOrNull(i + 1)
-            val mark = if (name.isEmpty()) null else markOf(token, next, serial)
+            val mark = if (name.isEmpty()) null else markOf(token, tokens.getOrNull(i + 1))
             when {
                 mark != null -> { rows += MarkRow(name.joinToString(" "), mark); name.clear() }
                 NAME_WORD.matches(token) -> name += token
@@ -44,12 +42,10 @@ object MarkRowParser {
         return rows
     }
 
-    private fun markOf(token: String, next: String?, serial: String?): String? {
+    private fun markOf(token: String, next: String?): String? {
         val upper = token.uppercase()
-        val nextIsName = next != null && NAME_WORD.matches(next)
         return when {
-            // A blank mark cell: the number after the name is the next table's serial (side-by-side rows share it).
-            SCORE.matches(token) -> token.takeUnless { it == serial && nextIsName }
+            SCORE.matches(token) -> token
             upper in ABSENT -> token
             token in NO_MARK -> "-"
             upper in ABSENT_MISREAD && (next == null || SCORE.matches(next)) -> "AB"
@@ -65,6 +61,13 @@ object NameMatcher {
 
     private fun key(name: String) = words(name).joinToString(" ")
 
+    /** Search box match: every typed word appears in the name, ignoring case, spaces and punctuation ("pall" finds "Adarsh Pallewad"). */
+    fun searchMatches(query: String, name: String): Boolean {
+        val typed = words(query)
+        val letters = words(name).joinToString("")
+        return typed.isNotEmpty() && typed.all { it in letters }
+    }
+
     fun match(rows: List<MarkRow>, studentNames: List<String>): MarkMatchResult {
         val matched = mutableMapOf<Int, String>()
         val unmatched = mutableListOf<MarkRow>()
@@ -77,9 +80,22 @@ object NameMatcher {
                 ?: free.firstOrNull { sortedKeys[it] == words(row.name).sorted() }
                 ?: closest(k, free, keys)
                 ?: missingWords(k, words(row.name), free, sortedKeys)
+                ?: sameLetters(row.name, free, studentNames)
             if (idx == null) unmatched += row else matched[idx] = row.marks
         }
         return MarkMatchResult(matched, unmatched)
+    }
+
+    /**
+     * "Harpreetsingh Mattu" for "Harpreet Singh": the names' letters agree once spaces are dropped and one starts with
+     * the other. Only for long names and a single candidate, so short names are never guessed.
+     */
+    private fun sameLetters(name: String, free: List<Int>, studentNames: List<String>): Int? {
+        val row = words(name).joinToString("")
+        return free.filter { i ->
+            val student = words(studentNames[i]).joinToString("")
+            minOf(row.length, student.length) >= 10 && (row.startsWith(student) || student.startsWith(row))
+        }.singleOrNull()
     }
 
     /** A marklist name that omits part of the contact name (e.g. only the surname) matches if exactly one student contains all its words. */

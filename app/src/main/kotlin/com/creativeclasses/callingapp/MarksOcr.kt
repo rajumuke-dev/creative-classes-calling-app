@@ -15,6 +15,7 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.abs
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 /** Reads a marklist image on-device and returns one text line per table row, top to bottom. */
@@ -22,6 +23,11 @@ object MarksOcr {
     private const val TARGET_WIDTH = 1400
     private const val LABEL = "Marks"
     private val MARK_CELL = Regex("^(\\d{1,3}|AB)$", RegexOption.IGNORE_CASE)
+    private val STRIP_SCALES = listOf(2, 3)
+    private const val STRIP_MAX_HEIGHT = 12_000
+    private const val BLANK = "-"
+    /** A cell holding only a name (letters, spaces, initials; OCR may keep a table border "|"). */
+    private val PERSON_NAME = Regex("""^\|?\s*\p{L}[\p{L} .'’-]*\p{L}$""")
 
     /** Small screenshots (e.g. from WhatsApp) are upscaled: digits are recognised far more reliably. */
     private fun loadScaled(context: Context, uri: Uri): Bitmap {
@@ -58,17 +64,31 @@ object MarksOcr {
                 }
             }
             val columns = marksColumns(rows)
+            val strips = columns.map { readStrip(recognizer, page, it) }
+            var belowHeader = false // Titles above the table never get a blank mark.
             return rows.map { row ->
                 val cells = row.sortedBy { it.second.left }.toMutableList()
+                val rowY = row.map { it.second.exactCenterY() }.average().toFloat()
                 for ((i, column) in columns.withIndex()) {
                     // Only this table's cells: right of the previous table's marks column.
                     val from = columns.getOrNull(i - 1)?.let { it.centre + it.halfWidth } ?: Float.NEGATIVE_INFINITY
                     val table = cells.filter { it.second.exactCenterX() > from && it.second.left < column.centre + column.halfWidth }
                     val inColumn = table.filter { column.overlaps(it.second) }
                     if (table.none { isName(it.first) }) continue
-                    // Lone digits are sometimes dropped or misread as a letter (e.g. "9" as "o"); read those cells again.
-                    if (inColumn.any { MARK_CELL.matches(it.first.trim().substringAfterLast(' ')) }) continue
-                    val recovered = rereadCell(recognizer, page, column, row) ?: continue
+                    val current = inColumn.lastOrNull()?.first?.trim()?.substringAfterLast(' ')
+                    val confirmed = agreed(strips[i], rowY, column)
+                    val readable = inColumn.any { MARK_CELL.matches(it.first.trim().substringAfterLast(' ')) }
+                    if (readable || confirmed != null) belowHeader = true
+                    val recovered = when {
+                        // The page pass can misread a digit inside a valid mark (e.g. "19" as "10"); the column read twice wins.
+                        confirmed != null && confirmed != current -> confirmed
+                        readable -> continue
+                        // Lone digits are sometimes dropped or misread as a letter (e.g. "9" as "o"); read those cells again.
+                        // Still unreadable: mark the cell blank so the next table's serial is not taken as this mark.
+                        else -> rereadCell(recognizer, page, column, row)
+                            ?: BLANK.takeIf { belowHeader && table.any { PERSON_NAME.matches(it.first.trim()) } }
+                            ?: continue
+                    }
                     val last = inColumn.lastOrNull()
                     if (last == null) {
                         cells += recovered to column.box(row.first().second)
@@ -84,6 +104,30 @@ object MarksOcr {
     }
 
     private fun isName(text: String) = text.count { it.isLetter() } >= 2 && !MARK_CELL.matches(text.trim())
+
+    /**
+     * Reads just the marks column, enlarged 2x and 3x: without the names beside them, digits are read more reliably.
+     * Each reading is a list of (text, centre y on the page). Empty for pages too tall to enlarge safely.
+     */
+    private suspend fun readStrip(recognizer: TextRecognizer, page: Bitmap, column: Column): List<List<Pair<String, Float>>> {
+        if (page.height * STRIP_SCALES.max() > STRIP_MAX_HEIGHT) return emptyList()
+        val left = (column.centre - column.halfWidth * 1.2f).toInt().coerceAtLeast(0)
+        val right = (column.centre + column.halfWidth * 1.2f).toInt().coerceAtMost(page.width)
+        if (right - left < 10) return emptyList()
+        val strip = Bitmap.createBitmap(page, left, 0, right - left, page.height)
+        return STRIP_SCALES.map { scale ->
+            val big = Bitmap.createScaledBitmap(strip, strip.width * scale, strip.height * scale, true)
+            recognize(recognizer, big).textBlocks.flatMap { it.lines }
+                .mapNotNull { line -> line.boundingBox?.let { line.text.trim() to it.exactCenterY() / scale } }
+        }
+    }
+
+    /** The mark both strip readings found on this row, if they agree; a single reading alone is not trusted. */
+    private fun agreed(reads: List<List<Pair<String, Float>>>, rowY: Float, column: Column): String? {
+        if (reads.isEmpty()) return null
+        val values = reads.map { read -> read.filter { abs(it.second - rowY) < column.height * 0.6f }.singleOrNull()?.first }
+        return values.first()?.takeIf { v -> MARK_CELL.matches(v) && values.all { it == v } }
+    }
 
     /**
      * One marks column per table, found from the cells read just after a name in each row (serials come before names).

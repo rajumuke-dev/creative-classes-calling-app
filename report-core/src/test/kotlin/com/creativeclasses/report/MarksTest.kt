@@ -91,9 +91,18 @@ class MarksTest {
     }
 
     @Test
-    fun `a serial number is not taken as the mark of a student whose mark cell is blank`() {
-        val rows = MarkRowParser.parse(listOf("9th SSC Batch- 1 EXAMMarklist", "15 Omkar Thorat 15 Radha Age 41"))
-        assertEquals(listOf("Radha Age" to "41"), rows.map { it.name to it.marks })
+    fun `a blank marks cell read as a dash keeps the next table's serial off the row`() {
+        val rows = MarkRowParser.parse(listOf("9th SSC Batch- 1 EXAMMarklist", "15 Omkar Thorat - 15 Radha Age 41"))
+        assertEquals(listOf("Omkar Thorat" to "-", "Radha Age" to "41"), rows.map { it.name to it.marks })
+    }
+
+    @Test
+    fun `a mark equal to the row's serial number is kept`() {
+        val rows = MarkRowParser.parse(listOf("20 Ishan Sisodiya AB Samruddhi Sonawane 20 Swara Mundhe 19"))
+        assertEquals(
+            listOf("Ishan Sisodiya" to "AB", "Samruddhi Sonawane" to "20", "Swara Mundhe" to "19"),
+            rows.map { it.name to it.marks },
+        )
     }
 
     @Test
@@ -123,6 +132,17 @@ class MarksTest {
     }
 
     @Test
+    fun `name written without spaces or with an extra surname matches the single student with the same letters`() {
+        val students = listOf("Harpreet Singh", "Shourya Singh", "Om Patil")
+        val result = NameMatcher.match(
+            listOf(MarkRow("Harpreetsingh Mattu", "AB"), MarkRow("Om Patil Kumar", "20")),
+            students,
+        )
+        assertEquals(mapOf(0 to "AB"), result.matched)
+        assertEquals(listOf(MarkRow("Om Patil Kumar", "20")), result.unmatched)
+    }
+
+    @Test
     fun `duplicate names each take one student`() {
         val result = NameMatcher.match(listOf(MarkRow("Amit Joshi", "10"), MarkRow("Amit Joshi", "20")), listOf("Amit Joshi", "Amit Joshi"))
         assertEquals(mapOf(0 to "10", 1 to "20"), result.matched)
@@ -132,5 +152,14 @@ class MarksTest {
     fun `table border characters from OCR are ignored`() {
         val rows = MarkRowParser.parse(listOf("| 2 | Aaradhya Shinde | 29 |"))
         assertEquals(listOf("Aaradhya Shinde" to "29"), rows.map { it.name to it.marks })
+    }
+
+    @Test
+    fun `name search ignores case, spaces and word order`() {
+        assertTrue(NameMatcher.searchMatches("pall", "Adarsh Pallewad"))
+        assertTrue(NameMatcher.searchMatches("singh harpreet", "Harpreetsingh Mattu"))
+        assertTrue(NameMatcher.searchMatches(" MUNDHE ", "Aaditi Mundhe"))
+        assertFalse(NameMatcher.searchMatches("mundhe x", "Aaditi Mundhe"))
+        assertFalse(NameMatcher.searchMatches("  ", "Aaditi Mundhe"))
     }
 }

@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ReportGeneratorTest {
     private val generator = ReportGenerator()
@@ -84,6 +85,7 @@ class ReportGeneratorTest {
         assertContains(text, "Asha Rao\nContact number not found, so the parent could not be called. Follow-up call required.")
         assertContains(text, "Partially Completed")
         assertFalse(text.contains("Not Yet Called"))
+        assertEquals(1, Regex("could not be called as no valid contact number was found").findAll(text).count())
     }
 
     @Test
@@ -174,5 +176,20 @@ class ReportGeneratorTest {
     fun `output is deterministic`() {
         val records = ok(3) + CallRecord("X", CallOutcome.NO_ANSWER)
         assertEquals(generator.generate(session, records), generator.generate(session, records))
+    }
+
+    @Test
+    fun `marks lists are separate sections of one report`() {
+        val low = listOf(CallRecord("Asha", CallOutcome.CONTACTED), CallRecord("Ravi", CallOutcome.NO_ANSWER))
+        val high = listOf(CallRecord("Meera", CallOutcome.CONTACTED, remark = "Parent is happy"))
+        val text = generator.generateSections(session, listOf(ReportSection("Lower than 20 marks", low), ReportSection("Higher than 80 marks", high))).text
+        val lowAt = text.indexOf("Lower than 20 marks (2 students):")
+        val highAt = text.indexOf("Higher than 80 marks (1 student):")
+        assertTrue(lowAt in 0 until highAt)
+        assertContains(text.substring(lowAt, highAt), "Call Not Received: 1")
+        assertContains(text.substring(highAt), "1. Meera\nParent is happy.")
+        assertEquals(1, Regex("Overall Status:").findAll(text).count())
+        assertContains(text, "Overall Status:\nPartially Completed")
+        assertEquals(generator.generate(session, low).text, generator.generateSections(session, listOf(ReportSection(null, low))).text)
     }
 }

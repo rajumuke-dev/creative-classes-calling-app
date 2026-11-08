@@ -6,6 +6,7 @@ import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.CallingPurpose
 import com.creativeclasses.report.Concern
 import com.creativeclasses.report.ImportedStudent
+import com.creativeclasses.report.MarkRow
 import com.creativeclasses.report.MarksRule
 import java.io.File
 import java.time.LocalDate
@@ -27,6 +28,10 @@ data class SavedSession(
     val savedReport: String? = null,
     /** Filter active when the session was left, so "Continue calling" returns to the same list. */
     val filter: CallFilter = CallFilter.ALL,
+    /** Mark kept for the other rule, so a session can work through both a Lower than and a Higher than list. */
+    val otherThreshold: String = "",
+    /** Name/marks rows read from the last marks image, kept so names can be searched there later. */
+    val imageRows: List<MarkRow> = emptyList(),
 ) {
     val title: String
         get() = form.sessionName.ifBlank {
@@ -100,6 +105,8 @@ class SessionStore(context: Context) {
         put("marksRule", s.marksRule.name)
         put("savedReport", s.savedReport ?: JSONObject.NULL)
         put("filter", s.filter.name)
+        put("otherThreshold", s.otherThreshold)
+        put("imageRows", JSONArray(s.imageRows.map { JSONObject().put("name", it.name).put("marks", it.marks) }))
     }
 
     private fun decode(o: JSONObject): SavedSession {
@@ -147,6 +154,8 @@ class SessionStore(context: Context) {
             marksRule = MarksRule.values().firstOrNull { it.name == o.optString("marksRule") } ?: MarksRule.BELOW,
             savedReport = if (o.has("savedReport") && !legacy) o.str("savedReport") else null,
             filter = if (legacy) legacyFilter else CallFilter.values().firstOrNull { it.name == o.optString("filter") } ?: CallFilter.ALL,
+            otherThreshold = o.optString("otherThreshold"),
+            imageRows = o.optJSONArray("imageRows")?.objects()?.map { MarkRow(it.getString("name"), it.getString("marks")) }.orEmpty(),
         )
     }
 

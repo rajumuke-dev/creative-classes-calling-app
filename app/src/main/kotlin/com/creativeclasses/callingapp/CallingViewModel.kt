@@ -11,12 +11,14 @@ import com.creativeclasses.report.CallRecord
 import com.creativeclasses.report.CallingPurpose
 import com.creativeclasses.report.CallingSession
 import com.creativeclasses.report.ImportedStudent
+import com.creativeclasses.report.MarkRow
 import com.creativeclasses.report.MarkRowParser
 import com.creativeclasses.report.Marks
 import com.creativeclasses.report.MarksRule
 import com.creativeclasses.report.NameMatcher
 import com.creativeclasses.report.PhoneNumbers
 import com.creativeclasses.report.ReportGenerator
+import com.creativeclasses.report.ReportSection
 import com.creativeclasses.report.SessionWorkbook
 import com.creativeclasses.report.SheetRow
 import com.creativeclasses.report.needsFollowUp
@@ -59,6 +61,12 @@ fun visibleIndices(filter: CallFilter, records: List<CallRecord>, marks: List<St
         }
     }
 
+/** The Lower than / Higher than lists set up in this session, each with its students in calling order. */
+fun SavedSession.marksLists(): List<Pair<String, List<Int>>> = MarksRule.values().mapNotNull { rule ->
+    val text = if (rule == marksRule) threshold else otherThreshold
+    if (thresholdOf(text) == null) null else "${rule.label} ${text.trim()}" to visibleIndices(CallFilter.BY_MARKS, records, marks, rule, text)
+}
+
 /** Next student to call in the list "Continue calling" reopens (the saved filter), or null when that list is done. */
 fun SavedSession.nextInList(): Int? =
     visibleIndices(filter, records, marks, marksRule, threshold).firstOrNull { records[it].outcome == CallOutcome.NOT_CALLED }
@@ -95,7 +103,10 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     var marks by mutableStateOf<List<String>>(emptyList())
     var threshold by mutableStateOf("")
     var marksRule by mutableStateOf(MarksRule.BELOW)
+    private var otherThreshold = ""
     var marksNotice by mutableStateOf<String?>(null)
+    var imageRows by mutableStateOf<List<MarkRow>>(emptyList())
+    var showNameSearch by mutableStateOf(false)
     var filterNotice by mutableStateOf<String?>(null)
     var reportScope by mutableStateOf<String?>(null)
     var form by mutableStateOf(SessionForm())
@@ -121,8 +132,19 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Every student in the list being worked through has an outcome: the marks/absent selection when that filter is on, otherwise the whole class. */
     val listDone: Boolean
-        get() = (if (filter == CallFilter.BY_MARKS || filter == CallFilter.ABSENT) visibleIndices else records.indices.toList())
-            .let { list -> list.isNotEmpty() && list.all { records[it].outcome != CallOutcome.NOT_CALLED } }
+        get() = listScope.let { list -> list.isNotEmpty() && list.all { records[it].outcome != CallOutcome.NOT_CALLED } }
+
+    /** Students counted at the top of the calling screen: the marks/absent list when that filter is on, otherwise the whole class. */
+    val listScope: List<Int>
+        get() = if (listName != null) visibleIndices else records.indices.toList()
+
+    /** Name of the list being counted, e.g. "Lower than 20", or null for the whole class. */
+    val listName: String?
+        get() = when {
+            filter == CallFilter.BY_MARKS && marksReady -> "${marksRule.label} ${threshold.trim()}"
+            filter == CallFilter.ABSENT -> "Absent"
+            else -> null
+        }
 
     val visibleIndices: List<Int> get() = visibleIndices(filter, records, marks, marksRule, threshold)
 
@@ -136,7 +158,10 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         scheduleSave()
     }
 
+    /** Each rule keeps its own mark, so switching to Higher than after the Lower than calls starts a second list. */
     fun updateMarksRule(rule: MarksRule) {
+        if (rule == marksRule) return
+        threshold = otherThreshold.also { otherThreshold = threshold }
         marksRule = rule
         scheduleSave()
     }
@@ -153,6 +178,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
                 val rows = MarkRowParser.parse(lines)
                 val result = NameMatcher.match(rows, students.map { it.name })
                 marks = marks.toMutableList().also { m -> result.matched.forEach { (i, v) -> m[i] = v } }
+                imageRows = rows
                 scheduleSave()
                 buildString {
                     append("Marks filled for ${result.matched.size} of ${students.size} students (${rows.size} rows read from the image).")
@@ -186,6 +212,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         records = emptyList()
         marks = emptyList()
         threshold = ""
+        otherThreshold = ""
+        imageRows = emptyList()
         marksRule = MarksRule.BELOW
         savedReport = null
         // Teacher details rarely change, so they carry over from the most recent session.
@@ -204,6 +232,8 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         marks = session.marks
         threshold = session.threshold
         marksRule = session.marksRule
+        otherThreshold = session.otherThreshold
+        imageRows = session.imageRows
         savedReport = session.savedReport
         filter = session.filter
         // Position in the visible (possibly filtered) list, as that is what the calling screen scrolls.
@@ -243,7 +273,7 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         store.save(snapshot(id))
     }
 
-    private fun snapshot(id: String) = SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport, filter)
+    private fun snapshot(id: String) = SavedSession(id, form, date, students, records, marks, threshold, marksRule, savedReport, filter, otherThreshold, imageRows)
 
     /** Saves first, then exports the open session with the report text being previewed. */
     fun exportCurrentExcel(): File {
@@ -253,21 +283,23 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Writes "<session name>.xlsx" from the session's latest saved state, so the file always matches the calls made.
-     * The report sheet uses [reportText], else the saved report, else a fresh report for the whole class.
+     * The report sheet uses [reportText], else the saved report, else a fresh report (every marks list when the session
+     * is on By marks, otherwise the whole class). Each marks list also gets its own table sheet.
      */
     fun exportExcel(session: SavedSession, reportText: String? = null): File {
         val calling = callingSession(session.form, session.date)
         val rows = session.records.mapIndexed { i, record ->
             SheetRow(session.students.getOrNull(i) ?: ImportedStudent(record.studentName, null, null), record, session.marks.getOrNull(i))
         }
-        val report = reportText ?: session.savedReport ?: ReportGenerator().generate(
-            calling,
-            rows.map { r -> r.record.copy(contactMissing = listOfNotNull(r.student.contact1, r.student.contact2).none { PhoneNumbers.isValid(it) }) },
-        ).text
+        val report = reportText ?: session.savedReport ?: generateReport(
+            session,
+            if (session.filter == CallFilter.BY_MARKS) CallFilter.BY_MARKS else CallFilter.ALL,
+        )?.first ?: generateReport(session, CallFilter.ALL)?.first
+        val lists = session.marksLists().filter { it.second.isNotEmpty() }.associate { (name, list) -> name to list.map { rows[it] } }
         // Only the latest export is kept; it is rebuilt on every share.
         val dir = File(getApplication<Application>().cacheDir, "exports").apply { deleteRecursively(); mkdirs() }
         return File(dir, SessionWorkbook.fileName(session.title)).also { file ->
-            file.outputStream().use { SessionWorkbook.write(it, calling.copy(sessionName = session.title), session.form.subject, rows, report) }
+            file.outputStream().use { SessionWorkbook.write(it, calling.copy(sessionName = session.title), session.form.subject, rows, report, lists) }
         }
     }
 
@@ -351,10 +383,6 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun hasValidContact(index: Int) = students[index].let { s ->
-        listOfNotNull(s.contact1, s.contact2).any { PhoneNumbers.isValid(it) }
-    }
-
     fun updateRecord(index: Int, change: (CallRecord) -> CallRecord) {
         val current = records[index]
         val updated = change(current)
@@ -367,14 +395,34 @@ class CallingViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun prepareReport() {
-        val session = callingSession(form, date)
-        val scope = visibleIndices.sorted()
-        if (scope.isEmpty()) {
+        val (text, scope) = generateReport(snapshot(currentId ?: "current"), filter) ?: run {
             filterNotice = "No students in this view to report. Change the filter first."
             return
         }
-        reportScope = if (filter == CallFilter.ALL) null else "${scope.size} of ${records.size} students (${filter.label} filter)"
-        reportText = ReportGenerator().generate(session, scope.map { records[it].copy(contactMissing = !hasValidContact(it)) }).text
+        reportScope = scope
+        reportText = text
         screen = Screen.REPORT
+    }
+
+    /**
+     * Report text and what it covers (null = whole class) for the students [filter] shows. On By marks, every marks list
+     * of the session (Lower than, then Higher than) is its own section, so one report covers both calling rounds.
+     */
+    private fun generateReport(session: SavedSession, filter: CallFilter): Pair<String, String?>? {
+        fun record(i: Int) = session.records[i].copy(
+            contactMissing = session.students.getOrNull(i)?.let { s -> listOfNotNull(s.contact1, s.contact2).none { PhoneNumbers.isValid(it) } } ?: true,
+        )
+        val calling = callingSession(session.form, session.date)
+        val lists = session.marksLists().filter { it.second.isNotEmpty() }
+        if (filter == CallFilter.BY_MARKS && lists.size > 1) {
+            val sections = lists.map { (name, list) -> ReportSection("$name marks", list.sorted().map(::record)) }
+            val count = lists.flatMap { it.second }.distinct().size
+            return ReportGenerator().generateSections(calling, sections).text to
+                "$count of ${session.records.size} students (${lists.joinToString(" and ") { it.first }} lists)"
+        }
+        val scope = visibleIndices(filter, session.records, session.marks, session.marksRule, session.threshold).sorted()
+        if (scope.isEmpty()) return null
+        val covers = if (filter == CallFilter.ALL) null else "${scope.size} of ${session.records.size} students (${filter.label} filter)"
+        return ReportGenerator().generate(calling, scope.map(::record)).text to covers
     }
 }

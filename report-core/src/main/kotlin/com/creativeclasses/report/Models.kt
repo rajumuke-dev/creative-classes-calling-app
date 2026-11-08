@@ -60,3 +60,6 @@ enum class ReportStatus(val label: String) {
 }
 
 data class ProfessionalReport(val text: String, val status: ReportStatus)
+
+/** Part of a report, e.g. the students of one marks list; [title] null means no heading. */
+data class ReportSection(val title: String?, val records: List<CallRecord>)

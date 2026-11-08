@@ -16,6 +16,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.rotate
@@ -92,7 +94,7 @@ internal val OUTCOME_CHOICES = listOf(
 @Composable
 fun CallingScreen(vm: CallingViewModel) {
     val context = LocalContext.current
-    val progress = SessionProgress.of(vm.records)
+    val progress = SessionProgress.of(vm.listScope.map { vm.records[it] })
     val shown = vm.visibleIndices
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = vm.resumeIndex)
     var showMarks by remember { mutableStateOf(false) }
@@ -126,7 +128,7 @@ fun CallingScreen(vm: CallingViewModel) {
     Column(Modifier.fillMaxSize().statusBarsPadding().cameraShake(reaction)) {
         Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = vm::goToDashboard) { Text("\u2190 Back") }
-            AnimatedCount("Called ${progress.attempted} / ${progress.total}", Modifier.weight(1f))
+            AnimatedCount("${vm.listName?.let { "$it:" } ?: "Called"} ${progress.attempted} / ${progress.total}", Modifier.weight(1f))
             TextButton(onClick = { showMarks = true }) { Text("Marks") }
             TextButton(onClick = openReport) { Text("Next \u2192") }
         }
@@ -166,12 +168,22 @@ fun CallingScreen(vm: CallingViewModel) {
             }
         }
         if (vm.filter == CallFilter.BY_MARKS && vm.hasMarks && vm.studentsWithoutMarks.isNotEmpty()) {
-            Text(
-                "Not listed, no marks entered: " + vm.studentsWithoutMarks.joinToString(", ") +
-                    ". Enter their marks on the cards (All filter) to include them.",
-                Modifier.padding(horizontal = 16.dp),
-                style = MaterialTheme.typography.bodySmall,
-            )
+            // Collapsed by default so the long name list does not push the student cards down.
+            var open by remember { mutableStateOf(false) }
+            val missing = vm.studentsWithoutMarks
+            Column(Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 16.dp, vertical = 4.dp).animateContentSize()) {
+                Text(
+                    "${missing.size} not listed, no marks entered ${if (open) "\u25B4" else "\u25BE"}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (open) {
+                    Text(
+                        missing.joinToString(", ") + ". Enter their marks on the cards (All filter) to include them.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
         if (shown.isEmpty()) {
             val hint = if (vm.filter == CallFilter.BY_MARKS && !vm.marksReady) {
@@ -453,6 +465,9 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
                 OutlinedButton(onClick = { picker.launch(arrayOf("image/*")) }, Modifier.fillMaxWidth()) {
                     Text("Read marks from image")
                 }
+                OutlinedButton(onClick = { vm.showNameSearch = true }, Modifier.fillMaxWidth()) {
+                    Text("Search names (list and image)")
+                }
                 Text(
                     "Type AB for absent. Absent and blank students never match Lower than / Higher than. Marks are not added to the report.",
                     Modifier.padding(top = 8.dp),
@@ -466,10 +481,12 @@ private fun MarksDialog(vm: CallingViewModel, onClose: () -> Unit) {
         AlertDialog(
             onDismissRequest = { vm.marksNotice = null },
             title = { Text("Marks from image") },
-            text = { Text(notice) },
+            text = { Text(notice, Modifier.verticalScroll(rememberScrollState())) },
             confirmButton = { TextButton(onClick = { vm.marksNotice = null }) { Text("OK") } },
+            dismissButton = { TextButton(onClick = { vm.showNameSearch = true }) { Text("Search names") } },
         )
     }
+    if (vm.showNameSearch) NameSearchDialog(vm)
 }
 
 /** Teacher name and when the teacher is available, told to parents who were not reached; saved with the session. */
