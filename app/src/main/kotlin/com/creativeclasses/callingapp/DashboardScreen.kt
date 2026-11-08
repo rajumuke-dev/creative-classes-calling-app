@@ -3,14 +3,25 @@ package com.creativeclasses.callingapp
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.LaunchedEffect
@@ -34,7 +45,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -132,6 +142,7 @@ private fun SessionCard(
     ) {
         Column(Modifier.fillMaxWidth().background(CardSheen).liveGlare().padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                ProgressRing(if (p.total == 0) 0f else p.attempted.toFloat() / p.total, Modifier.padding(end = 12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(session.title, style = MaterialTheme.typography.titleSmall)
                     Text(session.date.format(DATE_FORMAT), style = MaterialTheme.typography.bodySmall)
@@ -141,13 +152,6 @@ private fun SessionCard(
                     Modifier.clip(RoundedCornerShape(8.dp)).clickable { sheet = "Called" }.padding(4.dp),
                 )
             }
-            val progress by animateFloatAsState(if (p.total == 0) 0f else p.attempted.toFloat() / p.total, label = "progress")
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).height(8.dp).clip(CircleShape),
-                trackColor = MaterialTheme.colorScheme.primaryContainer,
-                strokeCap = StrokeCap.Round,
-            )
             val onTile = { t: StatTile -> sheet = t.label }
             StatRow(
                 onTile,
@@ -171,9 +175,15 @@ private fun SessionCard(
                     Modifier.weight(1f),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                // A pending follow-up gently pulses so it is not missed.
+                val pulse = if (p.followUps > 0) {
+                    rememberInfiniteTransition(label = "followUps").animateFloat(
+                        1f, 1.08f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "pulse",
+                    ).value
+                } else 1f
                 Text(
                     "Follow-ups ${p.followUps}",
-                    Modifier.clip(RoundedCornerShape(8.dp)).clickable { sheet = "Follow-ups" }.padding(4.dp),
+                    Modifier.scale(pulse).clip(RoundedCornerShape(8.dp)).clickable { sheet = "Follow-ups" }.padding(4.dp),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.tertiary,
                 )
@@ -201,15 +211,45 @@ private fun StatRow(onClick: (StatTile) -> Unit, vararg tiles: StatTile) {
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         tiles.forEach { t ->
             val color = outcomeColor(t.outcome)
+            val press = remember { MutableInteractionSource() }
+            val pressed by press.collectIsPressedAsState()
+            val bounce by animateFloatAsState(if (pressed) 0.9f else 1f, spring(dampingRatio = 0.35f), label = "bounce")
             Column(
-                Modifier.weight(1f).tiltOnTouch().clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = 0.12f)).clickable { onClick(t) }
+                Modifier.weight(1f).scale(bounce).tiltOnTouch().clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = 0.12f))
+                    .clickable(press, LocalIndication.current) { onClick(t) }
                     .padding(vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("${t.value}", style = MaterialTheme.typography.titleMedium, color = color)
+                Text("${countUp(t.value)}", style = MaterialTheme.typography.titleMedium, color = color)
                 Text(t.label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
             }
         }
+    }
+}
+
+/** [target] counted up from 0 when first shown, then animated on every change. */
+@Composable
+private fun countUp(target: Int): Int {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    return animateIntAsState(if (shown) target else 0, tween(900, easing = FastOutSlowInEasing), label = "countUp").value
+}
+
+/** Called share as a ring that fills from empty when the card appears, with the percentage in the middle. */
+@Composable
+private fun ProgressRing(fraction: Float, modifier: Modifier = Modifier) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val sweep by animateFloatAsState(if (shown) fraction else 0f, tween(1100, easing = FastOutSlowInEasing), label = "ring")
+    val track = MaterialTheme.colorScheme.primaryContainer
+    val fill = MaterialTheme.colorScheme.primary
+    Box(modifier.size(52.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val stroke = Stroke(6.dp.toPx(), cap = StrokeCap.Round)
+            drawArc(track, 0f, 360f, false, style = stroke)
+            drawArc(fill, -90f, 360f * sweep, false, style = stroke)
+        }
+        Text("${(sweep * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = fill)
     }
 }
 
