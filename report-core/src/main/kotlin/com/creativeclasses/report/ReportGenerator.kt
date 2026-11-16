@@ -75,19 +75,14 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
         closing(status, subject, contacted, concerns, followUps, noAnswer + callLater, notCalled, noContact)
             .forEach { out.appendLine(it) }
 
-        val listed = records.filterNot { it.isQuiet() }
-        if (listed.isNotEmpty()) {
+        // Every student is named, so the report shows exactly who was called.
+        if (records.isNotEmpty()) {
             out.appendLine()
             out.appendLine("Key Feedback & Follow-ups:")
-            listed.forEachIndexed { i, r ->
+            records.forEachIndexed { i, r ->
                 out.appendLine()
                 out.appendLine("${i + 1}. ${r.displayName()}")
                 out.appendLine(itemText(r))
-            }
-            val quiet = records.size - listed.size
-            if (quiet > 0) {
-                out.appendLine()
-                out.appendLine("The remaining ${count(quiet, "parent was", "parents were")} contacted and informed, with no concerns raised.")
             }
         }
     }
@@ -193,8 +188,6 @@ class ReportGenerator(private val organisation: String = "Creative Classes") {
 
     private fun CallRecord.isContacted() = outcome == CallOutcome.CONTACTED || outcome == CallOutcome.CONCERN_RAISED || outcome == CallOutcome.WILL_VISIT
     private fun CallRecord.hasConcern() = isContacted() && (outcome == CallOutcome.CONCERN_RAISED || concerns.isNotEmpty())
-    private fun CallRecord.isQuiet() =
-        outcome == CallOutcome.CONTACTED && !hasConcern() && !needsFollowUp() && cleanRemark(remark) == null
     private fun CallRecord.isPending() = outcome == CallOutcome.NOT_CALLED && cleanRemark(remark) == null
     private fun CallRecord.displayName() = studentName.clean() ?: "Student (name not recorded)"
 

@@ -98,5 +98,5 @@ emulator against the debug build: APK 54 MB → 14.4 MB, cold start ~0.45 s → 
 Release builds are signed with the local debug key so they install over the existing app and keep its data; use a
 proper release key before publishing to a store.
 
-The report covers only the students in the active filter. On By marks with both a Lower than and a Higher than list set,
+The report covers only the students in the active filter. Every student in it is listed by name with their result, including parents simply contacted. WhatsApp cuts one message at 4,096 characters, so a longer report is shared as one PDF with the full report (nothing trimmed) and the summary as the message caption. On By marks with both a Lower than and a Higher than list set,
 one report has a section (counts and feedback) for each list, with one overall status. Students with no valid phone number are listed as "Contact Not Found" follow-ups. Remarks can be dictated with Speak. The overall status is "Completed" once every student has a call result (including Not Received or Call Later, which stay as follow-ups) or a remark; it is "Partially Completed" only while some students have neither.

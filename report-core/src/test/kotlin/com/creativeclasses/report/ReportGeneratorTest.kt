@@ -38,6 +38,8 @@ class ReportGeneratorTest {
 
             All parents were informed regarding the 8th CBSE examination results and no concerns were reported.
 
+            Key Feedback & Follow-ups:
+${(1..25).joinToString("") { "\n            $it. Student $it\n            Parent contacted and informed.\n" }}
             Overall Status:
             Completed Successfully
 
@@ -55,9 +57,9 @@ class ReportGeneratorTest {
             "Parent is concerned about mathematics marks and requested a meeting with the teacher.",
         )
         val text = generator.generate(session, records).text
-        assertContains(text, "1. Rahul Patil\nParent expressed concern regarding Mathematics marks and requested a meeting with the teacher.")
+        assertContains(text, "3. Rahul Patil\nParent expressed concern regarding Mathematics marks and requested a meeting with the teacher.")
         assertContains(text, "Concerns Raised: 1")
-        assertContains(text, "The remaining 2 parents were contacted and informed, with no concerns raised.")
+        assertContains(text, "1. Student 1\nParent contacted and informed.\n\n2. Student 2\nParent contacted and informed.")
         assertFalse(text.contains("Low Marks") || text.contains("Remark:") || text.contains("CONCERN_RAISED"))
         assertEquals(ReportStatus.COMPLETED, generator.generate(session, records).status)
     }
@@ -110,7 +112,7 @@ class ReportGeneratorTest {
     @Test
     fun `no answer call lists follow-up call`() {
         val report = generator.generate(session, ok(1) + CallRecord("Amit Joshi", CallOutcome.NO_ANSWER))
-        assertContains(report.text, "1. Amit Joshi\nParent could not be reached. Follow-up call required.")
+        assertContains(report.text, "1. Student 1\nParent contacted and informed.\n\n2. Amit Joshi\nParent could not be reached. Follow-up call required.")
         assertContains(report.text, "1 parent requires follow-up.")
     }
 
@@ -145,6 +147,15 @@ class ReportGeneratorTest {
     }
 
     @Test
+    fun `every called student is named, including parents simply contacted`() {
+        val records = List(50) { CallRecord("Follow $it", CallOutcome.NO_ANSWER) } + List(24) { CallRecord("Plain $it", CallOutcome.CONTACTED) }
+        val text = generator.generate(session, records).text
+        records.forEachIndexed { i, r -> assertContains(text, "${i + 1}. ${r.studentName}\n") }
+        assertContains(text, "74. Plain 23\nParent contacted and informed.")
+        assertFalse(text.contains("remaining"))
+    }
+
+    @Test
     fun `empty and placeholder remarks are ignored`() {
         val records = listOf(
             CallRecord("A", CallOutcome.CONTACTED, remark = "   "),
@@ -153,8 +164,8 @@ class ReportGeneratorTest {
         )
         val report = generator.generate(session, records)
         assertEquals(ReportStatus.COMPLETED_SUCCESSFULLY, report.status)
-        assertFalse(report.text.contains("Key Feedback"))
-        assertFalse(report.text.contains("null", ignoreCase = true))
+        assertContains(report.text, "1. A\nParent contacted and informed.\n\n2. B\nParent contacted and informed.\n\n3. C\nParent contacted and informed.")
+        assertFalse(report.text.contains("N/A") || report.text.contains("null", ignoreCase = true))
     }
 
     @Test
