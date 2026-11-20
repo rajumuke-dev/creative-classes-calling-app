@@ -1,4 +1,4 @@
-# Creative Classes Calling App
+# 📞 Creative Classes Calling App
 
 [![License: MIT](https://img.shields.io/github/license/rajumuke-dev/creative-classes-calling-app)](LICENSE) [![Platform](https://img.shields.io/badge/platform-Android-lightgrey)](#) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md) [![Stars](https://img.shields.io/github/stars/rajumuke-dev/creative-classes-calling-app?style=social)](https://github.com/rajumuke-dev/creative-classes-calling-app)
 
