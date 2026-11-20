@@ -1,5 +1,7 @@
 # Creative Classes Calling App
 
+[![License: MIT](https://img.shields.io/github/license/rajumuke-dev/creative-classes-calling-app)](LICENSE) [![Platform](https://img.shields.io/badge/platform-Android-lightgrey)](#) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md) [![Stars](https://img.shields.io/github/stars/rajumuke-dev/creative-classes-calling-app?style=social)](https://github.com/rajumuke-dev/creative-classes-calling-app)
+
 Android app for teachers to call parents from an Excel list, record outcomes and share a professional report.
 
 - `report-core` – pure Kotlin/JVM: `ReportGenerator` (session + call records → report), `XlsxReader`, `StudentImporter`.
@@ -100,3 +102,6 @@ proper release key before publishing to a store.
 
 The report covers only the students in the active filter. Every student in it is listed by name with their result, including parents simply contacted. WhatsApp cuts one message at 4,096 characters, so a longer report is shared as one PDF with the full report (nothing trimmed) and the summary as the message caption. On By marks with both a Lower than and a Higher than list set,
 one report has a section (counts and feedback) for each list, with one overall status. Students with no valid phone number are listed as "Contact Not Found" follow-ups. Remarks can be dictated with Speak. The overall status is "Completed" once every student has a call result (including Not Received or Call Later, which stay as follow-ups) or a remark; it is "Partially Completed" only while some students have neither.
+
+## Contributing and security
+Fork, branch, and open a Pull Request; see [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities privately per [SECURITY.md](SECURITY.md). Licensed under [MIT](LICENSE).
