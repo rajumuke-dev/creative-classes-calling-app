@@ -4,6 +4,14 @@
 
 Android app for teachers to call parents from an Excel list, record outcomes and share a professional report.
 
+<div align="center">
+
+![Demo](docs/demo.gif)
+
+<sub>Illustrative animation of the main flow (not a screen recording).</sub>
+
+</div>
+
 - `report-core` – pure Kotlin/JVM: `ReportGenerator` (session + call records → report), `XlsxReader`, `StudentImporter`.
   Deterministic; uses only session data, outcomes, concern selections and teacher remarks; never invents facts.
 - `app` – Jetpack Compose UI: import an `.xlsx`, pick the sheet to call (class and board are pre-filled from the sheet
